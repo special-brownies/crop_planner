@@ -212,34 +212,53 @@
 								<input type="checkbox" checklist-model="self.cinfo_settings.seasons" checklist-value="season.id"> {{season.name}}
 							</label>
 							<br>
+							<label>
+								Season:
+								<select class="form-control" ng-model="self.cinfo_settings.season_filter">
+									<option value="all">All</option>
+									<option value="spring">Spring</option>
+									<option value="summer">Summer</option>
+									<option value="fall">Fall</option>
+									<option value="winter">Winter</option>
+								</select>
+							</label>
 							<label><input type="checkbox" ng-model="self.cinfo_settings.regrows"> Regrows</label>
 							<input type="text" class="form-control search" placeholder="Search" ng-model="self.cinfo_settings.search">
 						</div>
 						
 						<div class="crops_container">
 							<label><input type="checkbox" ng-model="self.cinfo_settings.use_fbp"> Use Fixed Budget Profit</label>
+							<label>
+								Sort by
+								<select class="form-control" ng-model="self.cinfo_settings.sort" ng-change="self.apply_sort(self.cinfo_settings.sort)">
+									<option value="profitPerDay">profitPerDay</option>
+									<option value="growthDays">growthDays</option>
+									<option value="sellPrice">sellPrice</option>
+									<option value="name">name</option>
+								</select>
+							</label>
 							<table class="table table-condensed crops">
 								<thead>
 									<tr>
 										<th ng-click="self.ci_set_sort('name')" colspan="2">Crop</th>
-										<th ng-click="self.ci_set_sort('grow')"><i class="fa fa-clock-o"></i> Days</th>
+										<th ng-click="self.ci_set_sort('growthDays')"><i class="fa fa-clock-o"></i> Days</th>
 										<th ng-click="self.ci_set_sort('buy')">Buy</th>
-										<th ng-click="self.ci_set_sort('sell')">Sell</th>
-										<th ng-click="self.ci_set_sort(self.cinfo_settings.use_fbp && 'fixed_profit' || 'profit')">g/day</th>
+										<th ng-click="self.ci_set_sort('sellPrice')">Sell</th>
+										<th ng-click="self.ci_set_sort(self.cinfo_settings.use_fbp && 'fixed_profit' || 'profitPerDay')">g/day</th>
 									</tr>
 								</thead>
 								<tbody>
-									<tr ng-repeat="crop in self.crops_list | orderBy:self.cinfo_settings.sort:self.cinfo_settings.order | filter: self.cinfo_settings.search" class="crop" ng-show="crop.can_grow(self.cinfo_settings.seasons, 1) && (!self.cinfo_settings.regrows || crop.regrow)" ng-click="self.sidebar.open_crop(crop)">
+									<tr ng-repeat="crop in self.get_visible_crops()" class="crop" ng-class="{'best-crop': self.is_best_crop(crop)}" ng-click="self.sidebar.open_crop(crop)">
 										<td width="1"><img ng-src="{{crop.get_image()}}"></td>
 										<td class="name">
 											{{crop.name}}
 											<span class="text-muted" ng-show="crop.harvest.min>1">(x{{crop.harvest.min}})</span>
 										</td>
-										<td>{{crop.grow}}</td>
+										<td>{{crop.growthDays}}</td>
 										<td>{{crop.buy}}g</td>
-										<td>{{crop.get_sell()}}g</td>
+										<td>{{crop.sellPrice}}g</td>
 										<td>
-											<span ng-show="!self.cinfo_settings.use_fbp">{{crop.profit}}g</span>
+											<span ng-show="!self.cinfo_settings.use_fbp">{{crop.profitPerDay}}g</span>
 											<span ng-show="self.cinfo_settings.use_fbp">{{crop.fixed_profit}}g</span>
 										</td>
 									</tr>
@@ -260,7 +279,7 @@
 						<table class="table table-condensed">
 							<tr>
 								<th><i class="fa fa-fw fa-clock-o"></i> Grows</th>
-								<td>{{self.sidebar.crop.grow}} days</td>
+								<td>{{self.sidebar.crop.growthDays}} days</td>
 							</tr>
 							<tr ng-show="self.sidebar.crop.regrow">
 								<th><i class="fa fa-fw fa-refresh"></i> Regrows</th>
@@ -276,11 +295,11 @@
 							</tr>
 							<tr>
 								<th><i class="fa fa-fw fa-plus-square"></i> Sell</th>
-								<td>{{self.sidebar.crop.get_sell()}}g</td>
+								<td>{{self.sidebar.crop.sellPrice}}g</td>
 							</tr>
 							<tr>
 								<th><i class="fa fa-fw fa-bar-chart"></i> Profit/day</th>
-								<td>{{self.sidebar.crop.profit}}g</td>
+								<td>{{self.sidebar.crop.profitPerDay}}g</td>
 							</tr>
 							<tr>
 								<th>
@@ -334,13 +353,14 @@
 					
 					<div class="farm_professions">
 						<h4>Farming Professions</h4>
-						<div class="btn" ng-class="{'btn-success': self.player.tiller, 'btn-default': !self.player.tiller}" ng-click="self.player.toggle_perk('tiller')" data-toggle="tooltip" title="Crops worth 10% more">
-							<i class="fa fa-tint"></i> Tiller
-						</div>
-						
-						<div class="btn" ng-class="{'btn-success': self.player.agriculturist, 'btn-default': !self.player.agriculturist}" ng-click="self.player.toggle_perk('agriculturist')" data-toggle="tooltip" title="All crops grow 10% faster">
-							<i class="fa fa-pagelines"></i> Agriculturist
-						</div>
+						<label>
+							Profession
+							<select class="form-control" ng-model="self.playerSettings.profession" ng-change="self.set_profession(self.playerSettings.profession)">
+								<option value="none">None</option>
+								<option value="tiller">Tiller (+10% sell)</option>
+								<option value="agriculturist">Agriculturist (-10% growth)</option>
+							</select>
+						</label>
 					</div>
 					
 					<hr>

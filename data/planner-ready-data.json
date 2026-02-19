@@ -1,0 +1,497 @@
+{
+  "crops": [
+    {
+      "id": "472",
+      "name": "Parsnip",
+      "seasons": [
+        "Spring"
+      ],
+      "growthDays": 4,
+      "regrowDays": -1,
+      "sellPrice": 35,
+      "profitPerDay": 8.75
+    },
+    {
+      "id": "473",
+      "name": "Green Bean",
+      "seasons": [
+        "Spring"
+      ],
+      "growthDays": 10,
+      "regrowDays": 3,
+      "sellPrice": 40,
+      "profitPerDay": 10.0
+    },
+    {
+      "id": "474",
+      "name": "Cauliflower",
+      "seasons": [
+        "Spring"
+      ],
+      "growthDays": 12,
+      "regrowDays": -1,
+      "sellPrice": 175,
+      "profitPerDay": 12.5
+    },
+    {
+      "id": "475",
+      "name": "Potato",
+      "seasons": [
+        "Spring"
+      ],
+      "growthDays": 6,
+      "regrowDays": -1,
+      "sellPrice": 80,
+      "profitPerDay": 11.43
+    },
+    {
+      "id": "476",
+      "name": "Garlic",
+      "seasons": [
+        "Spring"
+      ],
+      "growthDays": 4,
+      "regrowDays": -1,
+      "sellPrice": 60,
+      "profitPerDay": 15.0
+    },
+    {
+      "id": "273",
+      "name": "Unmilled Rice",
+      "seasons": [
+        "Spring"
+      ],
+      "growthDays": 8,
+      "regrowDays": -1,
+      "sellPrice": 30,
+      "profitPerDay": 3.21
+    },
+    {
+      "id": "831",
+      "name": "Taro Root",
+      "seasons": [
+        "Summer"
+      ],
+      "growthDays": 10,
+      "regrowDays": -1,
+      "sellPrice": 100,
+      "profitPerDay": 7.14
+    },
+    {
+      "id": "477",
+      "name": "Kale",
+      "seasons": [
+        "Spring"
+      ],
+      "growthDays": 6,
+      "regrowDays": -1,
+      "sellPrice": 110,
+      "profitPerDay": 15.71
+    },
+    {
+      "id": "478",
+      "name": "Rhubarb",
+      "seasons": [
+        "Spring"
+      ],
+      "growthDays": 13,
+      "regrowDays": -1,
+      "sellPrice": 220,
+      "profitPerDay": 15.71
+    },
+    {
+      "id": "745",
+      "name": "Strawberry",
+      "seasons": [
+        "Spring"
+      ],
+      "growthDays": 8,
+      "regrowDays": 4,
+      "sellPrice": 120,
+      "profitPerDay": 25.71
+    },
+    {
+      "id": "479",
+      "name": "Melon",
+      "seasons": [
+        "Summer"
+      ],
+      "growthDays": 12,
+      "regrowDays": -1,
+      "sellPrice": 250,
+      "profitPerDay": 17.86
+    },
+    {
+      "id": "480",
+      "name": "Tomato",
+      "seasons": [
+        "Summer"
+      ],
+      "growthDays": 11,
+      "regrowDays": 4,
+      "sellPrice": 60,
+      "profitPerDay": 10.71
+    },
+    {
+      "id": "481",
+      "name": "Blueberry",
+      "seasons": [
+        "Summer"
+      ],
+      "growthDays": 13,
+      "regrowDays": 4,
+      "sellPrice": 50,
+      "profitPerDay": 7.14
+    },
+    {
+      "id": "482",
+      "name": "Hot Pepper",
+      "seasons": [
+        "Summer"
+      ],
+      "growthDays": 5,
+      "regrowDays": 3,
+      "sellPrice": 40,
+      "profitPerDay": 11.43
+    },
+    {
+      "id": "483",
+      "name": "Wheat",
+      "seasons": [
+        "Summer",
+        "Fall"
+      ],
+      "growthDays": 4,
+      "regrowDays": -1,
+      "sellPrice": 25,
+      "profitPerDay": 6.25
+    },
+    {
+      "id": "484",
+      "name": "Radish",
+      "seasons": [
+        "Summer"
+      ],
+      "growthDays": 6,
+      "regrowDays": -1,
+      "sellPrice": 90,
+      "profitPerDay": 12.86
+    },
+    {
+      "id": "485",
+      "name": "Red Cabbage",
+      "seasons": [
+        "Summer"
+      ],
+      "growthDays": 9,
+      "regrowDays": -1,
+      "sellPrice": 260,
+      "profitPerDay": 27.86
+    },
+    {
+      "id": "486",
+      "name": "Starfruit",
+      "seasons": [
+        "Summer"
+      ],
+      "growthDays": 13,
+      "regrowDays": -1,
+      "sellPrice": 750,
+      "profitPerDay": 53.57
+    },
+    {
+      "id": "833",
+      "name": "Pineapple",
+      "seasons": [
+        "Summer"
+      ],
+      "growthDays": 14,
+      "regrowDays": 7,
+      "sellPrice": 300,
+      "profitPerDay": 32.14
+    },
+    {
+      "id": "433",
+      "name": "Coffee Bean",
+      "seasons": [
+        "Spring",
+        "Summer"
+      ],
+      "growthDays": 10,
+      "regrowDays": 2,
+      "sellPrice": 15,
+      "profitPerDay": 5.36
+    },
+    {
+      "id": "802",
+      "name": "Cactus Fruit",
+      "seasons": [
+        "Spring",
+        "Summer",
+        "Fall",
+        "Winter"
+      ],
+      "growthDays": 12,
+      "regrowDays": 3,
+      "sellPrice": 75,
+      "profitPerDay": 16.07
+    },
+    {
+      "id": "487",
+      "name": "Corn",
+      "seasons": [
+        "Summer",
+        "Fall"
+      ],
+      "growthDays": 14,
+      "regrowDays": 4,
+      "sellPrice": 50,
+      "profitPerDay": 7.14
+    },
+    {
+      "id": "302",
+      "name": "Hops",
+      "seasons": [
+        "Summer"
+      ],
+      "growthDays": 11,
+      "regrowDays": 1,
+      "sellPrice": 25,
+      "profitPerDay": 16.07
+    },
+    {
+      "id": "301",
+      "name": "Grape",
+      "seasons": [
+        "Fall"
+      ],
+      "growthDays": 10,
+      "regrowDays": 3,
+      "sellPrice": 80,
+      "profitPerDay": 20.0
+    },
+    {
+      "id": "299",
+      "name": "Amaranth",
+      "seasons": [
+        "Fall"
+      ],
+      "growthDays": 7,
+      "regrowDays": -1,
+      "sellPrice": 150,
+      "profitPerDay": 21.43
+    },
+    {
+      "id": "488",
+      "name": "Eggplant",
+      "seasons": [
+        "Fall"
+      ],
+      "growthDays": 5,
+      "regrowDays": 5,
+      "sellPrice": 60,
+      "profitPerDay": 10.71
+    },
+    {
+      "id": "489",
+      "name": "Artichoke",
+      "seasons": [
+        "Fall"
+      ],
+      "growthDays": 8,
+      "regrowDays": -1,
+      "sellPrice": 160,
+      "profitPerDay": 17.14
+    },
+    {
+      "id": "490",
+      "name": "Pumpkin",
+      "seasons": [
+        "Fall"
+      ],
+      "growthDays": 13,
+      "regrowDays": -1,
+      "sellPrice": 320,
+      "profitPerDay": 22.86
+    },
+    {
+      "id": "491",
+      "name": "Bok Choy",
+      "seasons": [
+        "Fall"
+      ],
+      "growthDays": 4,
+      "regrowDays": -1,
+      "sellPrice": 80,
+      "profitPerDay": 20.0
+    },
+    {
+      "id": "492",
+      "name": "Yam",
+      "seasons": [
+        "Fall"
+      ],
+      "growthDays": 10,
+      "regrowDays": -1,
+      "sellPrice": 160,
+      "profitPerDay": 11.43
+    },
+    {
+      "id": "493",
+      "name": "Cranberries",
+      "seasons": [
+        "Fall"
+      ],
+      "growthDays": 7,
+      "regrowDays": 5,
+      "sellPrice": 75,
+      "profitPerDay": 13.39
+    },
+    {
+      "id": "494",
+      "name": "Beet",
+      "seasons": [
+        "Fall"
+      ],
+      "growthDays": 6,
+      "regrowDays": -1,
+      "sellPrice": 100,
+      "profitPerDay": 14.29
+    },
+    {
+      "id": "499",
+      "name": "Ancient Fruit",
+      "seasons": [
+        "Spring",
+        "Summer",
+        "Fall"
+      ],
+      "growthDays": 28,
+      "regrowDays": 7,
+      "sellPrice": 550,
+      "profitPerDay": 19.64
+    },
+    {
+      "id": "427",
+      "name": "Tulip",
+      "seasons": [
+        "Spring"
+      ],
+      "growthDays": 6,
+      "regrowDays": -1,
+      "sellPrice": 30,
+      "profitPerDay": 4.29
+    },
+    {
+      "id": "429",
+      "name": "Blue Jazz",
+      "seasons": [
+        "Spring"
+      ],
+      "growthDays": 7,
+      "regrowDays": -1,
+      "sellPrice": 50,
+      "profitPerDay": 7.14
+    },
+    {
+      "id": "453",
+      "name": "Poppy",
+      "seasons": [
+        "Summer"
+      ],
+      "growthDays": 7,
+      "regrowDays": -1,
+      "sellPrice": 140,
+      "profitPerDay": 20.0
+    },
+    {
+      "id": "455",
+      "name": "Summer Spangle",
+      "seasons": [
+        "Summer"
+      ],
+      "growthDays": 8,
+      "regrowDays": -1,
+      "sellPrice": 90,
+      "profitPerDay": 9.64
+    },
+    {
+      "id": "431",
+      "name": "Sunflower",
+      "seasons": [
+        "Summer",
+        "Fall"
+      ],
+      "growthDays": 8,
+      "regrowDays": -1,
+      "sellPrice": 80,
+      "profitPerDay": 8.57
+    },
+    {
+      "id": "425",
+      "name": "Fairy Rose",
+      "seasons": [
+        "Fall"
+      ],
+      "growthDays": 12,
+      "regrowDays": -1,
+      "sellPrice": 290,
+      "profitPerDay": 20.71
+    },
+    {
+      "id": "347",
+      "name": "Sweet Gem Berry",
+      "seasons": [
+        "Fall"
+      ],
+      "growthDays": 24,
+      "regrowDays": -1,
+      "sellPrice": 3000,
+      "profitPerDay": 107.14
+    },
+    {
+      "id": "CarrotSeeds",
+      "name": "Carrot",
+      "seasons": [
+        "Spring"
+      ],
+      "growthDays": 3,
+      "regrowDays": -1,
+      "sellPrice": 35,
+      "profitPerDay": 11.25
+    },
+    {
+      "id": "SummerSquashSeeds",
+      "name": "Summer Squash",
+      "seasons": [
+        "Summer"
+      ],
+      "growthDays": 6,
+      "regrowDays": 3,
+      "sellPrice": 45,
+      "profitPerDay": 12.86
+    },
+    {
+      "id": "BroccoliSeeds",
+      "name": "Broccoli",
+      "seasons": [
+        "Fall"
+      ],
+      "growthDays": 8,
+      "regrowDays": 4,
+      "sellPrice": 70,
+      "profitPerDay": 15.0
+    },
+    {
+      "id": "PowdermelonSeeds",
+      "name": "Powdermelon",
+      "seasons": [
+        "Winter"
+      ],
+      "growthDays": 7,
+      "regrowDays": -1,
+      "sellPrice": 60,
+      "profitPerDay": 8.57
+    }
+  ]
+}

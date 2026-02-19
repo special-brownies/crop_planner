@@ -85,28 +85,252 @@ function planner_controller($scope){
 	self.get_season = get_season;		// Get season object by id
 	self.get_date = get_date;			// Get formatted date string
 	self.ci_set_sort = ci_set_sort;		// Set key to sort crop info by
+	self.apply_sort = apply_sort;
 	self.planner_valid_crops = planner_valid_crops;
+	self.get_visible_crops = get_visible_crops;
+	self.is_best_crop = is_best_crop;
+	self.set_profession = set_profession;
 	
 	// Crop info search/filter settings
 	self.cinfo_settings = {
 		season: "spring",
 		seasons: ["spring"],
 		season_options: [],
-		sort: "name",
+		sort: "profitPerDay",
 		search: "",
 		regrows: false,
-		order: false,
+		order: true,
 		use_fbp: false,
+		season_filter: "all",
+	};
+	
+	let cropsData = [];
+	self.best_crop_id = null;
+	self.playerSettings = {
+		profession: "none", // "none" | "tiller" | "agriculturist"
 	};
 	
 	
 	/********************************
 		PLANNER INITIALIZATION
 	********************************/
+	function adapt_planner_crop(crop){
+		var seasons = [];
+		$.each(crop.seasons || [], function(i, season){
+			seasons.push((season + "").toLowerCase());
+		});
+		var image_safe_id = ((crop.name || "") + "").toLowerCase().replace(/\s+/g, "_");
+		
+		return {
+			id: image_safe_id,
+			name: crop.name,
+			buy: 0,
+			sell: crop.sellPrice,
+			regrow: crop.regrowDays,
+			regrowDays: crop.regrowDays,
+			growthDays: crop.growthDays,
+			stages: [crop.growthDays],
+			seasons: seasons,
+			harvest: {
+				min: 1,
+				max: 1,
+				extra_chance: 0,
+				level_increase: 0
+			}
+		};
+	}
+	
+	function adapt_planner_crops(crops){
+		var adapted = [];
+		$.each(crops || [], function(i, crop){
+			adapted.push(adapt_planner_crop(crop));
+		});
+		return adapted;
+	}
+	
+	function get_profession(){
+		return self.playerSettings.profession || "none";
+	}
+	
+	function apply_profession_to_player(){
+		var profession = get_profession();
+		self.player.profession = profession;
+		self.player.tiller = (profession == "tiller" || profession == "agriculturist");
+		self.player.agriculturist = (profession == "agriculturist");
+	}
+	
+	function sync_profession_from_player(){
+		var profession = "none";
+		if (self.player.agriculturist){
+			profession = "agriculturist";
+		} else if (self.player.tiller){
+			profession = "tiller";
+		}
+		self.playerSettings.profession = profession;
+		self.player.profession = profession;
+	}
+	
+	function set_profession(profession){
+		var valid_professions = {none: true, tiller: true, agriculturist: true};
+		if (!valid_professions[profession]) profession = "none";
+		
+		self.playerSettings.profession = profession;
+		apply_profession_to_player();
+		refresh_crop_metrics();
+		self.player.save();
+		if (self.years.length){
+			update(self.years[0].data.farm, true);
+			update(self.years[0].data.greenhouse, true);
+		}
+	}
+	
+	function calculateProfit(crop, settings){
+		settings = settings || {};
+		var profession = settings.profession || "none";
+		var use_fixed_budget = settings.useFixedBudget ? true : false;
+		
+		var base_sell = crop.base_sell || crop.sell || 0;
+		var base_growth_days = crop.base_grow || crop.grow || 1;
+		var regrow_days = parseInt(crop.regrow || 0);
+		if (regrow_days < 0) regrow_days = 0;
+		
+		var sell_price = base_sell;
+		if (profession == "tiller"){
+			sell_price = Math.floor(sell_price * 1.1);
+		}
+		
+		var growth_days = base_growth_days;
+		if (profession == "agriculturist"){
+			growth_days = Math.max(1, Math.round(growth_days * 0.9));
+		}
+		
+		var harvest_count = 0;
+		var planting_count = 0;
+		if (regrow_days > 0){
+			if (growth_days <= SEASON_DAYS){
+				harvest_count = 1 + Math.floor((SEASON_DAYS - growth_days) / regrow_days);
+				planting_count = 1;
+			}
+		} else {
+			harvest_count = Math.floor(SEASON_DAYS / growth_days);
+			planting_count = harvest_count;
+		}
+		
+		var planting_multiplier = 1;
+		if (use_fixed_budget){
+			planting_multiplier = crop.buy > 0 ? Math.floor(1000 / crop.buy) : 1;
+			planting_multiplier = Math.max(1, planting_multiplier);
+		}
+		
+		var harvest_yield = crop.harvest.min || 1;
+		var total_revenue = sell_price * harvest_yield * harvest_count * planting_multiplier;
+		var total_cost = crop.buy * planting_count * planting_multiplier;
+		var total_season_profit = total_revenue - total_cost;
+		var profit_per_day = round(total_season_profit / SEASON_DAYS, 1);
+		
+		return {
+			sellPrice: sell_price,
+			growthDays: growth_days,
+			totalSeasonProfit: total_season_profit,
+			profitPerDay: profit_per_day
+		};
+	}
+	
+	function refresh_crop_metrics(){
+		var settings = {profession: get_profession()};
+		$.each(self.crops_list, function(i, crop){
+			var profit_data = calculateProfit(crop, settings);
+			var fixed_profit_data = calculateProfit(crop, {profession: settings.profession, useFixedBudget: true});
+			crop.sellPrice = profit_data.sellPrice;
+			crop.growthDays = profit_data.growthDays;
+			crop.profitPerDay = profit_data.profitPerDay;
+			crop.profit = profit_data.profitPerDay;
+			crop.fixed_profit = fixed_profit_data.profitPerDay;
+		});
+	}
+	
+	function get_crop_sort_value(crop, sort_key){
+		switch(sort_key){
+			case "growthDays":
+			case "grow":
+				return crop.growthDays;
+			case "sellPrice":
+			case "sell":
+				return crop.sellPrice;
+			case "profitPerDay":
+			case "profit":
+			case "fixed_profit":
+				return self.cinfo_settings.use_fbp ? crop.fixed_profit : crop.profitPerDay;
+			case "buy":
+				return crop.buy;
+			case "name":
+			default:
+				return crop.name;
+		}
+	}
+	
+	function get_visible_crops(){
+		var search = (self.cinfo_settings.search || "").toLowerCase();
+		var season_filter = self.cinfo_settings.season_filter || "all";
+		var seasons = self.cinfo_settings.seasons || [];
+		var rows = [];
+		
+		$.each(self.crops_list, function(i, crop){
+			if (search && crop.name.toLowerCase().indexOf(search) == -1) return;
+			if (self.cinfo_settings.regrows && !(crop.regrow > 0)) return;
+			
+			var in_season = false;
+			if (season_filter != "all"){
+				in_season = crop.seasons.indexOf(season_filter) != -1;
+			} else if (seasons.length){
+				$.each(seasons, function(ii, season){
+					if (crop.seasons.indexOf(season) != -1){
+						in_season = true;
+						return false;
+					}
+				});
+			} else {
+				in_season = true;
+			}
+			
+			if (!in_season) return;
+			rows.push(crop);
+		});
+		
+		var sort_key = self.cinfo_settings.sort || "profitPerDay";
+		rows.sort(function(a, b){
+			var va = get_crop_sort_value(a, sort_key);
+			var vb = get_crop_sort_value(b, sort_key);
+			if (typeof va == "string" || typeof vb == "string"){
+				va = (va || "").toString().toLowerCase();
+				vb = (vb || "").toString().toLowerCase();
+				return va.localeCompare(vb);
+			}
+			return va - vb;
+		});
+		if (self.cinfo_settings.order) rows.reverse();
+		
+		var best_crop = null;
+		$.each(rows, function(i, crop){
+			if (!best_crop || crop.profitPerDay > best_crop.profitPerDay){
+				best_crop = crop;
+			}
+		});
+		self.best_crop_id = best_crop ? best_crop.id : null;
+		
+		return rows;
+	}
+	
+	function is_best_crop(crop){
+		return crop && crop.id == self.best_crop_id;
+	}
+	
 	function init(){
 		// Initialize planner variables
 		self.sidebar = new Sidebar;
 		self.player = new Player;
+		sync_profession_from_player();
+		apply_profession_to_player();
 		self.planner_modal  = $("#crop_planner");
 		
 		for (var i = 0; i < self.days.length; i++) self.days[i] = i + 1;
@@ -147,19 +371,26 @@ function planner_controller($scope){
 			}, 400);
 		}
 		
-		// Load planner config data
-		$.ajax({
-			url: "config.json",
-			dataType: "json",
-			success: function(config){
-				self.config = config;
+		// Load planner config data and external crops data
+		$.when(
+			$.getJSON("config.json"),
+			$.getJSON("data/planner-ready-data.json")
+		).done(function(config_result, crop_data_result){
+				self.config = config_result[0];
+				var planner_data = crop_data_result[0] || {};
+				if (planner_data.crops){
+					self.config.crops = adapt_planner_crops(planner_data.crops);
+				}
+				
+				cropsData = self.config.crops || [];
 				
 				// Process crop data
-				$.each(self.config.crops, function(i, crop){
+				$.each(cropsData, function(i, crop){
 					crop = new Crop(crop);
 					self.crops_list.push(crop);
 					self.crops[crop.id] = crop;
 				});
+				refresh_crop_metrics();
 				
 				// Process fertilizer data
 				$.each(self.config.fertilizer, function(i, fertilizer){
@@ -202,14 +433,12 @@ function planner_controller($scope){
 				
 				self.loaded = true;
 				$scope.$apply();
-			},
-			error: function(xhr, status, error){
-				if (!xhr.responseText) return;
+			}).fail(function(xhr, status, error){
+				if (!xhr || !xhr.responseText) return;
 				alert("An error occurred in loading planner data. Check the browser console.");
 				console.log("Error: ", status);
 				console.log("Reason: ", error);
-			}
-		});
+			});
 	}
 	
 	
@@ -307,7 +536,6 @@ function planner_controller($scope){
 			
 			$.each(plans, function(i, plan){
 				var crop = plan.crop;
-				var first_harvest = date + plan.get_grow_time();
 				var planting_cost = plan.get_cost();
 				var season = self.seasons[Math.floor((plan.date-1)/SEASON_DAYS)];
 				var crop_end = crop.end;
@@ -330,22 +558,12 @@ function planner_controller($scope){
 				// Update seasonal number of plantings
 				s_plant_total.plantings += plan.amount;
 				
-				// If first harvest of crop occurs after its
-				// growth season(s), continue $.each
-				if (first_harvest > crop_end) return;
+				var lifecycle = getCropLifecycle(crop, date, crop_end, plan.fertilizer);
+				if (!lifecycle.length) return;
 				
-				// Initial harvest
 				var harvests = [];
-				harvests.push(new Harvest(plan, first_harvest));
-				
-				// Regrowth harvests
-				if (crop.regrow){
-					var regrowths = Math.floor((crop_end - first_harvest) / crop.regrow);
-					for (var i = 1; i <= regrowths; i++){
-						var regrow_date = first_harvest + (i * crop.regrow);
-						if (regrow_date > crop_end) break;
-						harvests.push(new Harvest(plan, regrow_date, true));
-					}
+				for (var i = 0; i < lifecycle.length; i++){
+					harvests.push(new Harvest(plan, lifecycle[i].day, i > 0));
 				}
 				
 				// Assign harvests to plan object
@@ -615,12 +833,96 @@ function planner_controller($scope){
 	
 	// Set key to sort crop info by
 	function ci_set_sort(key){
+		var descending_keys = {profitPerDay: true, fixed_profit: true, sellPrice: true, growthDays: true, sell: true, grow: true, buy: true};
 		if (self.cinfo_settings.sort == key){
 			self.cinfo_settings.order = !self.cinfo_settings.order;
 		} else {
 			self.cinfo_settings.sort = key;
-			self.cinfo_settings.order = false;
+			self.cinfo_settings.order = descending_keys[key] ? true : false;
 		}
+	}
+	
+	function apply_sort(key){
+		var descending_keys = {profitPerDay: true, fixed_profit: true, sellPrice: true, growthDays: true, sell: true, grow: true, buy: true};
+		self.cinfo_settings.sort = key;
+		self.cinfo_settings.order = descending_keys[key] ? true : false;
+	}
+	
+	function getGrowthModifier(fertilizerName){
+		if (!fertilizerName) return 1;
+		
+		switch((fertilizerName + "").toLowerCase()){
+			case "speed-gro":
+			case "speed gro":
+			case "speed_gro":
+				return 0.9;
+			case "deluxe speed-gro":
+			case "delux speed-gro":
+			case "deluxe speed gro":
+			case "delux speed gro":
+			case "deluxe_speed_gro":
+			case "delux_speed_gro":
+				return 0.75;
+			default:
+				return 1;
+		}
+	}
+	
+	function getCropLifecycle(crop, plantDay, maxDay, currentFertilizer){
+		if (!crop || !plantDay) return [];
+		
+		var growthDays = crop.growthDays;
+		if (!growthDays && crop.stages && crop.stages.length){
+			growthDays = 0;
+			for (var i = 0; i < crop.stages.length; i++){
+				growthDays += crop.stages[i];
+			}
+		}
+		
+		var fertilizerName = "";
+		if (currentFertilizer){
+			fertilizerName = currentFertilizer.id || currentFertilizer.name || "";
+		}
+		var modifier = getGrowthModifier(fertilizerName);
+		growthDays = parseInt(growthDays || 0);
+		if (isNaN(growthDays) || growthDays < 1) growthDays = 1;
+		growthDays = Math.max(1, Math.floor(growthDays * modifier));
+		
+		var regrowDays = crop.regrowDays;
+		if (regrowDays === null || typeof regrowDays == "undefined"){
+			regrowDays = crop.regrow;
+		}
+		regrowDays = parseInt(regrowDays);
+		if (isNaN(regrowDays)) regrowDays = -1;
+		
+		var limitDay = maxDay;
+		if (typeof limitDay != "number"){
+			limitDay = get_season(plantDay).end;
+		}
+		
+		var lifecycle = [];
+		var harvestDay = plantDay + growthDays;
+		if (harvestDay > limitDay) return lifecycle;
+		
+		lifecycle.push({
+			day: harvestDay,
+			type: "harvest",
+			crop: crop
+		});
+		
+		if (regrowDays > 0){
+			var nextDay = harvestDay + regrowDays;
+			while (nextDay <= limitDay){
+				lifecycle.push({
+					day: nextDay,
+					type: "harvest",
+					crop: crop
+				});
+				nextDay += regrowDays;
+			}
+		}
+		
+		return lifecycle;
 	}
 	
 	// Filter crops that can be planted in the planner's drop down list
@@ -834,6 +1136,7 @@ function planner_controller($scope){
 		self.level = 0; // farming level; starts at 0
 		self.tiller = false;
 		self.agriculturist = false;
+		self.profession = "none";
 		
 		self.load = load
 		self.save = save;
@@ -859,8 +1162,16 @@ function planner_controller($scope){
 			var pdata = LOAD_JSON("player");
 			if (!pdata) return;
 			
+			if (pdata.profession) self.profession = pdata.profession;
 			if (pdata.tiller) self.tiller = true;
 			if (pdata.agriculturist) self.agriculturist = true;
+			if (self.profession == "agriculturist"){
+				self.tiller = true;
+				self.agriculturist = true;
+			} else if (self.profession == "tiller"){
+				self.tiller = true;
+				self.agriculturist = false;
+			}
 			if (pdata.level) self.level = pdata.level;
 			if (pdata.settings) self.settings = pdata.settings;
 		}
@@ -868,6 +1179,7 @@ function planner_controller($scope){
 		// Save player config to browser storage
 		function save(){
 			var pdata = {};
+			pdata.profession = self.profession || "none";
 			if (self.tiller) pdata.tiller = self.tiller;
 			if (self.agriculturist) pdata.agriculturist = self.agriculturist;
 			pdata.settings = self.settings;
@@ -884,6 +1196,17 @@ function planner_controller($scope){
 				self.agriculturist = false;
 			} else if (self.agriculturist && key == "agriculturist"){
 				self.tiller = true;
+			}
+			
+			self.profession = "none";
+			if (self.agriculturist){
+				self.profession = "agriculturist";
+			} else if (self.tiller){
+				self.profession = "tiller";
+			}
+			
+			if (planner && planner.set_profession){
+				planner.set_profession(self.profession);
 			}
 		}
 		
@@ -972,9 +1295,14 @@ function planner_controller($scope){
 		self.note = "";
 		self.start = 0;			// Start of grow season(s)
 		self.end = 0;			// End of grow season(s)
+		self.base_sell = 0;		// Base sell price before profession modifiers
+		self.base_grow = 0;		// Base growth days before profession modifiers
 		self.grow = 0;			// Total days to grow
 		self.profit = 0;		// Minimum profit/day (for crops info menu)
 		self.fixed_profit = 0;	// Fixed budget profit
+		self.profitPerDay = 0;
+		self.growthDays = 0;
+		self.sellPrice = 0;
 		
 		
 		init();
@@ -1007,27 +1335,17 @@ function planner_controller($scope){
 			for (var i = 0; i < data.stages.length; i++){
 				self.grow += data.stages[i];
 			}
+			self.base_sell = self.sell;
+			self.base_grow = self.grow;
 			
-			// Calculate profit per day
-			var season_days = (self.end - self.start) + 1;
-			var regrowths = self.regrow ? Math.floor(((season_days - 1) - self.grow) / self.regrow) : 0;
-			
-			var plantings = 1;
-			if (!regrowths) plantings = Math.floor((season_days - 1) / self.grow);
-			var growth_days = (plantings * self.grow) + (regrowths * (self.regrow ? self.regrow : 0));
-			
-			self.profit -= self.buy * plantings;
-			self.profit += self.harvest.min * self.get_sell() * (plantings + regrowths);
-			self.profit = round(self.profit / growth_days, 1);
-			
-			// Calculate fixed budget profit
-			var budget = 1000; // 1000g worth of seeds
-			var plantings = Math.floor(budget / self.buy);
-			var growth_days = self.grow + (regrowths * (self.regrow ? self.regrow : 0));
-			
-			self.fixed_profit -= self.buy * plantings;
-			self.fixed_profit += self.harvest.min * self.get_sell() * (plantings + regrowths);
-			self.fixed_profit = round((self.fixed_profit / growth_days), 1);
+			// Initial values before profession-aware refresh
+			var base_profit = calculateProfit(self, {profession: "none"});
+			var base_fixed_profit = calculateProfit(self, {profession: "none", useFixedBudget: true});
+			self.sellPrice = base_profit.sellPrice;
+			self.growthDays = base_profit.growthDays;
+			self.profitPerDay = base_profit.profitPerDay;
+			self.profit = base_profit.profitPerDay;
+			self.fixed_profit = base_fixed_profit.profitPerDay;
 		}
 	}
 	
@@ -1203,16 +1521,44 @@ function planner_controller($scope){
 		this.farm().plans[date].push(plan);
 		
 		// Auto-replanting within current year
-		var crop_growth = plan.get_grow_time();
-		var next_planting = date + crop_growth;
-		var next_grow = next_planting + crop_growth;
-		if (!auto_replant || crop.regrow || (auto_replant && !crop.can_grow(next_grow, false, planner.in_greenhouse()))){
+		var regrowDays = crop.regrowDays;
+		if (regrowDays === null || typeof regrowDays == "undefined"){
+			regrowDays = crop.regrow;
+		}
+		regrowDays = parseInt(regrowDays);
+		if (isNaN(regrowDays)) regrowDays = -1;
+		
+		if (!auto_replant || regrowDays > 0){
 			// Update
 			update(this);
 			save_data();
 		} else if (auto_replant){
+			var in_greenhouse = planner.in_greenhouse();
+			var crop_end = in_greenhouse ? YEAR_DAYS : crop.end;
+			var lifecycle = getCropLifecycle(crop, date, crop_end, plan.fertilizer);
+			if (!lifecycle.length){
+				// No more cycles available for current crop
+				update(this);
+				save_data();
+				return;
+			}
+			
+			// Replant on harvest day (non-regrow crops)
+			var replant_event = {
+				day: lifecycle[0].day,
+				type: "replant",
+				crop: crop
+			};
+			var nextPlanting = replant_event.day;
+			var nextLifecycle = getCropLifecycle(crop, nextPlanting, crop_end, plan.fertilizer);
+			if (!nextLifecycle.length){
+				update(this);
+				save_data();
+				return;
+			}
+
 			// Auto-replant
-			this.add_plan(newplan, next_planting, true);
+			this.add_plan(newplan, nextPlanting, true);
 		}
 	};
 	
@@ -1220,7 +1566,9 @@ function planner_controller($scope){
 	Year.prototype.remove_plan = function(date, index){
 		var farm = this.farm();
 		if (!farm.plans[date][index]) return;
-		var full_update = farm.plans[date][index].crop.regrow;
+		var regrowDays = parseInt(farm.plans[date][index].crop.regrowDays);
+		if (isNaN(regrowDays)) regrowDays = parseInt(farm.plans[date][index].crop.regrow);
+		var full_update = regrowDays > 0;
 		farm.plans[date].splice(index, 1);
 		save_data();
 		update(this, full_update);
@@ -1265,7 +1613,9 @@ function planner_controller($scope){
 		
 		for (var date = start_day; date <= end_day; date++){
 			for (var i = 0; i < this.plans[date].length; i++){
-				if (this.plans[date][i].crop.regrow){
+				var regrowDays = parseInt(this.plans[date][i].crop.regrowDays);
+				if (isNaN(regrowDays)) regrowDays = parseInt(this.plans[date][i].crop.regrow);
+				if (regrowDays > 0){
 					return true;
 				}
 			}
