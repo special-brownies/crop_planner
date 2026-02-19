@@ -1,6 +1,6 @@
 # 🌾 Stardew Valley Crop Planner — Modernized Fork
 
-An updated and modernized fork of the original Stardew Valley Crop Planner, fully upgraded to support **Stardew Valley 1.6+ data**, improved economic calculations, and enhanced UI behavior.
+An updated and modernized fork of the original Stardew Valley Crop Planner by exnil, fully upgraded to support **Stardew Valley 1.6+ data**, improved economic calculations, and enhanced UI behavior.
 
 This fork focuses on **accuracy, completeness, and maintainability**, bringing the planner in line with the latest game mechanics.
 
