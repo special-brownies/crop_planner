@@ -441,7 +441,7 @@
 								<h3 class="panel-title"><i class="fa fa-tint"></i> Planting</h3>
 							</div>
 							<div class="panel-body">
-								<table class="crops table table-condensed">
+								<table class="crops table table-condensed planting-table">
 									<thead>
 										<tr>
 											<th colspan="2">Crop</th>
@@ -462,9 +462,14 @@
 											<td>
 												{{plan.crop.name}}
 											</td>
-											<td>
-												<span ng-show="self.editplan!=plan">x{{plan.amount}}</span>
-												<span ng-show="self.editplan==plan">x<input style="padding-left:2px;width:100px" class="form-control" type="number" min="1" ng-model="plan.amount"></span>
+											<td class="amount-cell">
+												<div class="amount-wrapper" ng-show="self.editplan!=plan">
+													<span>x{{plan.amount}}</span>
+												</div>
+												<div class="amount-wrapper" ng-show="self.editplan==plan">
+													<span>x</span>
+													<input class="form-control" type="number" min="1" ng-model="plan.amount">
+												</div>
 											</td>
 											<td>
 												<div ng-show="plan.fertilizer.id!='none' && self.editplan!=plan">
@@ -475,7 +480,7 @@
 													<select class="form-control" ng-model="plan.fertilizer" ng-options="fert as fert.name for fert in self.config.fertilizer track by fert.id"></select>
 												</div>
 											</td>
-											<td>-{{plan.get_cost(1)}}g</td>
+											<td>{{plan.get_display_cost(1) > 0 && '-' || ''}}{{plan.get_display_cost(1)}}g</td>
 											<td>{{plan.get_grow_time()}}</td>
 											<td>{{plan.crop.regrow}}</td>
 											<td>

@@ -9,6 +9,7 @@
       "growthDays": 4,
       "regrowDays": -1,
       "sellPrice": 35,
+      "seedPrice": 20,
       "profitPerDay": 8.75
     },
     {
@@ -20,6 +21,7 @@
       "growthDays": 10,
       "regrowDays": 3,
       "sellPrice": 40,
+      "seedPrice": 60,
       "profitPerDay": 10.0
     },
     {
@@ -31,6 +33,7 @@
       "growthDays": 12,
       "regrowDays": -1,
       "sellPrice": 175,
+      "seedPrice": 80,
       "profitPerDay": 12.5
     },
     {
@@ -42,6 +45,7 @@
       "growthDays": 6,
       "regrowDays": -1,
       "sellPrice": 80,
+      "seedPrice": 50,
       "profitPerDay": 11.43
     },
     {
@@ -53,6 +57,7 @@
       "growthDays": 4,
       "regrowDays": -1,
       "sellPrice": 60,
+      "seedPrice": 40,
       "profitPerDay": 15.0
     },
     {
@@ -64,6 +69,7 @@
       "growthDays": 8,
       "regrowDays": -1,
       "sellPrice": 30,
+      "seedPrice": 40,
       "profitPerDay": 3.21
     },
     {
@@ -75,6 +81,7 @@
       "growthDays": 10,
       "regrowDays": -1,
       "sellPrice": 100,
+      "seedPrice": 0,
       "profitPerDay": 7.14
     },
     {
@@ -86,6 +93,7 @@
       "growthDays": 6,
       "regrowDays": -1,
       "sellPrice": 110,
+      "seedPrice": 70,
       "profitPerDay": 15.71
     },
     {
@@ -97,6 +105,7 @@
       "growthDays": 13,
       "regrowDays": -1,
       "sellPrice": 220,
+      "seedPrice": 100,
       "profitPerDay": 15.71
     },
     {
@@ -108,6 +117,7 @@
       "growthDays": 8,
       "regrowDays": 4,
       "sellPrice": 120,
+      "seedPrice": 100,
       "profitPerDay": 25.71
     },
     {
@@ -119,6 +129,7 @@
       "growthDays": 12,
       "regrowDays": -1,
       "sellPrice": 250,
+      "seedPrice": 80,
       "profitPerDay": 17.86
     },
     {
@@ -130,6 +141,7 @@
       "growthDays": 11,
       "regrowDays": 4,
       "sellPrice": 60,
+      "seedPrice": 50,
       "profitPerDay": 10.71
     },
     {
@@ -141,6 +153,7 @@
       "growthDays": 13,
       "regrowDays": 4,
       "sellPrice": 50,
+      "seedPrice": 80,
       "profitPerDay": 7.14
     },
     {
@@ -152,6 +165,7 @@
       "growthDays": 5,
       "regrowDays": 3,
       "sellPrice": 40,
+      "seedPrice": 40,
       "profitPerDay": 11.43
     },
     {
@@ -164,6 +178,7 @@
       "growthDays": 4,
       "regrowDays": -1,
       "sellPrice": 25,
+      "seedPrice": 10,
       "profitPerDay": 6.25
     },
     {
@@ -175,6 +190,7 @@
       "growthDays": 6,
       "regrowDays": -1,
       "sellPrice": 90,
+      "seedPrice": 40,
       "profitPerDay": 12.86
     },
     {
@@ -186,6 +202,7 @@
       "growthDays": 9,
       "regrowDays": -1,
       "sellPrice": 260,
+      "seedPrice": 100,
       "profitPerDay": 27.86
     },
     {
@@ -197,6 +214,7 @@
       "growthDays": 13,
       "regrowDays": -1,
       "sellPrice": 750,
+      "seedPrice": 400,
       "profitPerDay": 53.57
     },
     {
@@ -208,6 +226,7 @@
       "growthDays": 14,
       "regrowDays": 7,
       "sellPrice": 300,
+      "seedPrice": 100,
       "profitPerDay": 32.14
     },
     {
@@ -220,6 +239,7 @@
       "growthDays": 10,
       "regrowDays": 2,
       "sellPrice": 15,
+      "seedPrice": 250,
       "profitPerDay": 5.36
     },
     {
@@ -234,6 +254,7 @@
       "growthDays": 12,
       "regrowDays": 3,
       "sellPrice": 75,
+      "seedPrice": 150,
       "profitPerDay": 16.07
     },
     {
@@ -246,6 +267,7 @@
       "growthDays": 14,
       "regrowDays": 4,
       "sellPrice": 50,
+      "seedPrice": 150,
       "profitPerDay": 7.14
     },
     {
@@ -257,6 +279,7 @@
       "growthDays": 11,
       "regrowDays": 1,
       "sellPrice": 25,
+      "seedPrice": 60,
       "profitPerDay": 16.07
     },
     {
@@ -268,6 +291,7 @@
       "growthDays": 10,
       "regrowDays": 3,
       "sellPrice": 80,
+      "seedPrice": 60,
       "profitPerDay": 20.0
     },
     {
@@ -279,6 +303,7 @@
       "growthDays": 7,
       "regrowDays": -1,
       "sellPrice": 150,
+      "seedPrice": 70,
       "profitPerDay": 21.43
     },
     {
@@ -290,6 +315,7 @@
       "growthDays": 5,
       "regrowDays": 5,
       "sellPrice": 60,
+      "seedPrice": 20,
       "profitPerDay": 10.71
     },
     {
@@ -301,6 +327,7 @@
       "growthDays": 8,
       "regrowDays": -1,
       "sellPrice": 160,
+      "seedPrice": 30,
       "profitPerDay": 17.14
     },
     {
@@ -312,6 +339,7 @@
       "growthDays": 13,
       "regrowDays": -1,
       "sellPrice": 320,
+      "seedPrice": 100,
       "profitPerDay": 22.86
     },
     {
@@ -323,6 +351,7 @@
       "growthDays": 4,
       "regrowDays": -1,
       "sellPrice": 80,
+      "seedPrice": 50,
       "profitPerDay": 20.0
     },
     {
@@ -334,6 +363,7 @@
       "growthDays": 10,
       "regrowDays": -1,
       "sellPrice": 160,
+      "seedPrice": 60,
       "profitPerDay": 11.43
     },
     {
@@ -345,6 +375,7 @@
       "growthDays": 7,
       "regrowDays": 5,
       "sellPrice": 75,
+      "seedPrice": 240,
       "profitPerDay": 13.39
     },
     {
@@ -356,6 +387,7 @@
       "growthDays": 6,
       "regrowDays": -1,
       "sellPrice": 100,
+      "seedPrice": 20,
       "profitPerDay": 14.29
     },
     {
@@ -369,6 +401,7 @@
       "growthDays": 28,
       "regrowDays": 7,
       "sellPrice": 550,
+      "seedPrice": 500,
       "profitPerDay": 19.64
     },
     {
@@ -380,6 +413,7 @@
       "growthDays": 6,
       "regrowDays": -1,
       "sellPrice": 30,
+      "seedPrice": 20,
       "profitPerDay": 4.29
     },
     {
@@ -391,6 +425,7 @@
       "growthDays": 7,
       "regrowDays": -1,
       "sellPrice": 50,
+      "seedPrice": 30,
       "profitPerDay": 7.14
     },
     {
@@ -402,6 +437,7 @@
       "growthDays": 7,
       "regrowDays": -1,
       "sellPrice": 140,
+      "seedPrice": 100,
       "profitPerDay": 20.0
     },
     {
@@ -413,6 +449,7 @@
       "growthDays": 8,
       "regrowDays": -1,
       "sellPrice": 90,
+      "seedPrice": 50,
       "profitPerDay": 9.64
     },
     {
@@ -425,6 +462,7 @@
       "growthDays": 8,
       "regrowDays": -1,
       "sellPrice": 80,
+      "seedPrice": 200,
       "profitPerDay": 8.57
     },
     {
@@ -436,6 +474,7 @@
       "growthDays": 12,
       "regrowDays": -1,
       "sellPrice": 290,
+      "seedPrice": 200,
       "profitPerDay": 20.71
     },
     {
@@ -447,6 +486,7 @@
       "growthDays": 24,
       "regrowDays": -1,
       "sellPrice": 3000,
+      "seedPrice": 1000,
       "profitPerDay": 107.14
     },
     {
@@ -458,6 +498,7 @@
       "growthDays": 3,
       "regrowDays": -1,
       "sellPrice": 35,
+      "seedPrice": 10,
       "profitPerDay": 11.25
     },
     {
@@ -469,6 +510,7 @@
       "growthDays": 6,
       "regrowDays": 3,
       "sellPrice": 45,
+      "seedPrice": 20,
       "profitPerDay": 12.86
     },
     {
@@ -480,6 +522,7 @@
       "growthDays": 8,
       "regrowDays": 4,
       "sellPrice": 70,
+      "seedPrice": 20,
       "profitPerDay": 15.0
     },
     {
@@ -491,6 +534,7 @@
       "growthDays": 7,
       "regrowDays": -1,
       "sellPrice": 60,
+      "seedPrice": 20,
       "profitPerDay": 8.57
     }
   ]

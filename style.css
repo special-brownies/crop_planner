@@ -2,3 +2,27 @@
 #sb_cropinfo .crops_container .crops tbody tr.best-crop td{background-color:#f7f0d1}
 #sb_cropinfo .crops_container .crops tbody tr.best-crop:hover td{background-color:#fff6da}
 
+
+/* Planting table amount input alignment */
+.planting-table td {
+  vertical-align: middle;
+}
+
+.planting-table .amount-cell {
+  text-align: center;
+  vertical-align: middle;
+}
+
+.planting-table .amount-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+}
+
+.planting-table .amount-wrapper input[type="number"] {
+  text-align: center;
+  width: 60px;
+  float: none;
+  margin: 0;
+}

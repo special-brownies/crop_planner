@@ -737,6 +737,11 @@
 			"name": "Quality Fertilizer"
 		},
 		{
+			"buy": 200,
+			"id": "deluxe_fertilizer",
+			"name": "Deluxe Fertilizer"
+		},
+		{
 			"buy": 100,
 			"growth_rate": 0.1,
 			"id": "speed_gro",
@@ -746,7 +751,28 @@
 			"buy": 150,
 			"growth_rate": 0.25,
 			"id": "delux_speed_gro",
-			"name": "Delux Speed-Gro"
+			"name": "Deluxe Speed-Gro"
+		},
+		{
+			"buy": 300,
+			"growth_rate": 0.33,
+			"id": "hyper_speed_gro",
+			"name": "Hyper Speed-Gro"
+		},
+		{
+			"buy": 100,
+			"id": "basic_retaining_soil",
+			"name": "Basic Retaining Soil"
+		},
+		{
+			"buy": 150,
+			"id": "quality_retaining_soil",
+			"name": "Quality Retaining Soil"
+		},
+		{
+			"buy": 200,
+			"id": "deluxe_retaining_soil",
+			"name": "Deluxe Retaining Soil"
 		}
 	],
 	"events": {

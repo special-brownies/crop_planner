@@ -4,6 +4,225 @@ var YEAR_DAYS = SEASON_DAYS * 4;
 var VERSION = "2.0";
 var DATA_VERSION = "2";
 
+const playerSettings = {
+	profession: "none", // "none" | "agriculturist" | "tiller"
+	farmingLevel: 0 // integer 0-10
+};
+
+const fertilizerEffects = {
+	"basic fertilizer": {qualityBonus: 0.01},
+	"quality fertilizer": {qualityBonus: 0.02},
+	"deluxe fertilizer": {qualityBonus: 0.04},
+	"speed-gro": {growthModifier: 0.9},
+	"deluxe speed-gro": {growthModifier: 0.75},
+	"hyper speed-gro": {growthModifier: 0.67},
+	"basic retaining soil": {waterRetention: 0.33},
+	"quality retaining soil": {waterRetention: 0.66},
+	"deluxe retaining soil": {waterRetention: 1.0}
+};
+
+const fertilizerCosts = {
+	"basic fertilizer": 100,
+	"quality fertilizer": 150,
+	"speed-gro": 100,
+	"deluxe speed-gro": 150,
+	"basic retaining soil": 100,
+	"quality retaining soil": 150
+};
+
+const fertilizerIdToEffectKey = {
+	basic_fertilizer: "basic fertilizer",
+	quality_fertilizer: "quality fertilizer",
+	deluxe_fertilizer: "deluxe fertilizer",
+	speed_gro: "speed-gro",
+	delux_speed_gro: "deluxe speed-gro",
+	deluxe_speed_gro: "deluxe speed-gro",
+	hyper_speed_gro: "hyper speed-gro",
+	basic_retaining_soil: "basic retaining soil",
+	quality_retaining_soil: "quality retaining soil",
+	deluxe_retaining_soil: "deluxe retaining soil"
+};
+
+const fertilizerImageAliases = {
+	deluxe_speed_gro: "delux_speed_gro"
+};
+
+
+function normalize_fertilizer_effect_name(name){
+	return ((name || "") + "").toLowerCase().trim().replace(/\s+/g, " ");
+}
+
+function normalize_fertilizer_image_name(name){
+	return ((name || "") + "").toLowerCase().trim().replace(/[\s-]+/g, "_");
+}
+
+function is_dev_mode(){
+	return typeof window != "undefined"
+		&& window.location
+		&& window.location.hash == "#dev";
+}
+
+function dev_log(){
+	if (!is_dev_mode() || !window.console || !console.log) return;
+	console.log.apply(console, arguments);
+}
+
+function clamp_farming_level(level){
+	level = parseInt(level, 10);
+	if (isNaN(level)) level = 0;
+	return Math.max(0, Math.min(10, level));
+}
+
+function get_fertilizer_effect_key(fertilizer){
+	if (!fertilizer) return "";
+	
+	var fertilizer_id = "";
+	var fertilizer_name = "";
+	if (typeof fertilizer == "string"){
+		fertilizer_id = ((fertilizer || "") + "").toLowerCase().trim();
+		fertilizer_name = normalize_fertilizer_effect_name(fertilizer);
+	} else {
+		fertilizer_id = ((fertilizer.id || "") + "").toLowerCase().trim();
+		fertilizer_name = normalize_fertilizer_effect_name(fertilizer.name || fertilizer_id);
+	}
+	
+	if (fertilizer_id && fertilizerIdToEffectKey[fertilizer_id]){
+		return fertilizerIdToEffectKey[fertilizer_id];
+	}
+	if (fertilizer_name && fertilizerEffects[fertilizer_name]){
+		return fertilizer_name;
+	}
+	
+	var from_id = normalize_fertilizer_effect_name(fertilizer_id.replace(/_/g, " "));
+	if (from_id && fertilizerEffects[from_id]){
+		return from_id;
+	}
+	return "";
+}
+
+function get_fertilizer_effect(fertilizer){
+	var effect_key = get_fertilizer_effect_key(fertilizer);
+	if (!effect_key || !fertilizerEffects[effect_key]) return {};
+	return fertilizerEffects[effect_key];
+}
+
+function getSeedCost(crop){
+	if (!crop) return 0;
+	return Number(crop.seedPrice) || 0;
+}
+
+function get_seed_cost(crop){
+	return getSeedCost(crop);
+}
+
+function get_fertilizer_cost(currentFertilizer){
+	var fertilizer_name = "";
+	if (currentFertilizer && currentFertilizer.name){
+		fertilizer_name = normalize_fertilizer_effect_name(currentFertilizer.name);
+	}
+	if (fertilizer_name && typeof fertilizerCosts[fertilizer_name] != "undefined"){
+		return fertilizerCosts[fertilizer_name] || 0;
+	}
+	
+	// Saved plans may only have id-based fertilizer references.
+	var effect_key = get_fertilizer_effect_key(currentFertilizer);
+	if (effect_key && typeof fertilizerCosts[effect_key] != "undefined"){
+		return fertilizerCosts[effect_key] || 0;
+	}
+	return 0;
+}
+
+function get_total_planting_cost(crop, currentFertilizer, amount){
+	amount = parseInt(amount, 10);
+	if (isNaN(amount) || amount < 1) amount = 1;
+	
+	var per_seed_cost = 0;
+	if (crop && typeof crop.seedCost == "number" && !isNaN(crop.seedCost)){
+		per_seed_cost = crop.seedCost;
+	} else {
+		per_seed_cost = get_seed_cost(crop);
+	}
+	var seed_cost = per_seed_cost * amount;
+	var fertilizer_cost = get_fertilizer_cost(currentFertilizer) * amount;
+	var total_cost = seed_cost + fertilizer_cost;
+	var display_cost = total_cost === 0 ? 0 : total_cost;
+	if (crop && crop.name){
+		dev_log("Cost debug:", {
+			crop: crop.name,
+			seed: seed_cost,
+			fertilizer: fertilizer_cost,
+			total: total_cost
+		});
+	}
+	
+	return {
+		seedCost: seed_cost,
+		fertilizerCost: fertilizer_cost,
+		totalCost: total_cost,
+		displayCost: display_cost
+	};
+}
+
+function get_crop_base_growth_days(crop){
+	if (!crop) return 1;
+	
+	var base_growth = parseInt(crop.base_grow || crop.grow || crop.growthDays, 10);
+	if (isNaN(base_growth) || base_growth < 1){
+		base_growth = 0;
+		if (crop.stages && crop.stages.length){
+			for (var i = 0; i < crop.stages.length; i++){
+				base_growth += parseInt(crop.stages[i] || 0, 10);
+			}
+		}
+	}
+	if (isNaN(base_growth) || base_growth < 1) base_growth = 1;
+	return base_growth;
+}
+
+function get_crop_regrow_days(crop){
+	var regrow_days = crop && (crop.regrowDays || crop.regrow);
+	regrow_days = parseInt(regrow_days, 10);
+	if (isNaN(regrow_days)) regrow_days = -1;
+	return regrow_days;
+}
+
+function get_growth_days_with_modifiers(crop, currentFertilizer, profession){
+	var fert = get_fertilizer_effect(currentFertilizer);
+	var base_growth = get_crop_base_growth_days(crop);
+	var growth_modifier = fert.growthModifier || 1;
+	
+	if ((profession || playerSettings.profession) == "agriculturist"){
+		growth_modifier *= 0.9;
+	}
+	
+	return Math.max(1, Math.floor(base_growth * growth_modifier));
+}
+
+function get_quality_distribution(level, quality_bonus){
+	level = clamp_farming_level(level);
+	quality_bonus = parseFloat(quality_bonus || 0);
+	if (isNaN(quality_bonus)) quality_bonus = 0;
+	
+	var gold_chance = Math.min(0.75, (level * 0.01) + quality_bonus);
+	var silver_chance = Math.min(0.75, gold_chance * 2);
+	var normal_chance = Math.max(0, 1 - (gold_chance + silver_chance));
+	
+	return {
+		normal: normal_chance,
+		silver: silver_chance,
+		gold: gold_chance
+	};
+}
+
+function get_average_sell_price(sellPrice, level, fertilizer){
+	var fert = get_fertilizer_effect(fertilizer);
+	var distribution = get_quality_distribution(level, fert.qualityBonus || 0);
+	
+	return (sellPrice * distribution.normal)
+		+ (sellPrice * 1.25 * distribution.silver)
+		+ (sellPrice * 1.5 * distribution.gold);
+}
+
 
 // Save/load helper functions
 function SAVE_JSON(key, data){
@@ -22,6 +241,11 @@ function LOAD_JSON(key, raw_json){
 function round(num, decimals){
 	decimals = Math.pow(10, decimals || 0);
 	return Math.round(num * decimals) / decimals;
+}
+
+function clean_zero(value){
+	if (value === 0 || Math.abs(value) < 1e-9) return 0;
+	return value;
 }
 
 
@@ -90,6 +314,7 @@ function planner_controller($scope){
 	self.get_visible_crops = get_visible_crops;
 	self.is_best_crop = is_best_crop;
 	self.set_profession = set_profession;
+	self.calculateMultiSeasonProfit = calculateMultiSeasonProfit;
 	
 	// Crop info search/filter settings
 	self.cinfo_settings = {
@@ -106,9 +331,28 @@ function planner_controller($scope){
 	
 	let cropsData = [];
 	self.best_crop_id = null;
-	self.playerSettings = {
-		profession: "none", // "none" | "tiller" | "agriculturist"
-	};
+	self.playerSettings = playerSettings;
+	
+	$scope.$watch(function(){
+		return self.player ? self.player.level : null;
+	}, function(new_level){
+		if (!self.player) return;
+		
+		var farming_level = clamp_farming_level(new_level);
+		var level_changed = self.playerSettings.farmingLevel !== farming_level;
+		if (self.player.level !== farming_level){
+			self.player.level = farming_level;
+		}
+		self.playerSettings.farmingLevel = farming_level;
+		
+		if (!level_changed) return;
+		refresh_crop_metrics();
+		if (self.years.length){
+			update(self.years[0].data.farm, true);
+			update(self.years[0].data.greenhouse, true);
+		}
+		self.player.save();
+	});
 	
 	
 	/********************************
@@ -120,11 +364,14 @@ function planner_controller($scope){
 			seasons.push((season + "").toLowerCase());
 		});
 		var image_safe_id = ((crop.name || "") + "").toLowerCase().replace(/\s+/g, "_");
+		var seed_cost = getSeedCost(crop);
 		
 		return {
 			id: image_safe_id,
 			name: crop.name,
-			buy: 0,
+			buy: seed_cost,
+			seedPrice: seed_cost,
+			seedCost: seed_cost,
 			sell: crop.sellPrice,
 			regrow: crop.regrowDays,
 			regrowDays: crop.regrowDays,
@@ -142,7 +389,11 @@ function planner_controller($scope){
 	
 	function adapt_planner_crops(crops){
 		var adapted = [];
+		if (crops && crops.length){
+			dev_log("Loaded crop sample:", crops[0]);
+		}
 		$.each(crops || [], function(i, crop){
+			dev_log("Loaded crop:", crop.name, crop.seedPrice);
 			adapted.push(adapt_planner_crop(crop));
 		});
 		return adapted;
@@ -152,6 +403,10 @@ function planner_controller($scope){
 		return self.playerSettings.profession || "none";
 	}
 	
+	function get_farming_level(){
+		return clamp_farming_level(self.playerSettings.farmingLevel);
+	}
+	
 	function apply_profession_to_player(){
 		var profession = get_profession();
 		self.player.profession = profession;
@@ -159,14 +414,23 @@ function planner_controller($scope){
 		self.player.agriculturist = (profession == "agriculturist");
 	}
 	
+	function apply_farming_level_to_player(){
+		self.player.level = get_farming_level();
+	}
+	
 	function sync_profession_from_player(){
-		var profession = "none";
-		if (self.player.agriculturist){
-			profession = "agriculturist";
-		} else if (self.player.tiller){
-			profession = "tiller";
+		var valid_professions = {none: true, tiller: true, agriculturist: true};
+		var profession = valid_professions[self.player.profession] ? self.player.profession : "none";
+		if (profession == "none"){
+			if (self.player.agriculturist){
+				profession = "agriculturist";
+			} else if (self.player.tiller){
+				profession = "tiller";
+			}
 		}
 		self.playerSettings.profession = profession;
+		self.playerSettings.farmingLevel = clamp_farming_level(self.player.level);
+		self.player.level = self.playerSettings.farmingLevel;
 		self.player.profession = profession;
 	}
 	
@@ -176,6 +440,7 @@ function planner_controller($scope){
 		
 		self.playerSettings.profession = profession;
 		apply_profession_to_player();
+		apply_farming_level_to_player();
 		refresh_crop_metrics();
 		self.player.save();
 		if (self.years.length){
@@ -186,61 +451,72 @@ function planner_controller($scope){
 	
 	function calculateProfit(crop, settings){
 		settings = settings || {};
-		var profession = settings.profession || "none";
+		var profession = settings.profession || get_profession();
+		var farming_level = (typeof settings.farmingLevel != "undefined") ? settings.farmingLevel : get_farming_level();
+		farming_level = clamp_farming_level(farming_level);
 		var use_fixed_budget = settings.useFixedBudget ? true : false;
+		var fertilizer = settings.fertilizer || self.fertilizer.none;
+		var season_count = parseInt(settings.seasonCount, 10);
+		if (isNaN(season_count) || season_count < 1){
+			season_count = Math.max(1, (crop.seasons || []).length || 1);
+		}
 		
 		var base_sell = crop.base_sell || crop.sell || 0;
-		var base_growth_days = crop.base_grow || crop.grow || 1;
-		var regrow_days = parseInt(crop.regrow || 0);
-		if (regrow_days < 0) regrow_days = 0;
-		
 		var sell_price = base_sell;
 		if (profession == "tiller"){
-			sell_price = Math.floor(sell_price * 1.1);
+			sell_price *= 1.1;
 		}
+		sell_price = round(sell_price, 2);
 		
-		var growth_days = base_growth_days;
-		if (profession == "agriculturist"){
-			growth_days = Math.max(1, Math.round(growth_days * 0.9));
-		}
-		
-		var harvest_count = 0;
-		var planting_count = 0;
-		if (regrow_days > 0){
-			if (growth_days <= SEASON_DAYS){
-				harvest_count = 1 + Math.floor((SEASON_DAYS - growth_days) / regrow_days);
-				planting_count = 1;
-			}
-		} else {
-			harvest_count = Math.floor(SEASON_DAYS / growth_days);
-			planting_count = harvest_count;
-		}
+		var growth_days = get_growth_days_with_modifiers(crop, fertilizer, profession);
+		var avg_sell_price = get_average_sell_price(sell_price, farming_level, fertilizer);
 		
 		var planting_multiplier = 1;
+		var seed_cost = get_seed_cost(crop);
 		if (use_fixed_budget){
-			planting_multiplier = crop.buy > 0 ? Math.floor(1000 / crop.buy) : 1;
+			planting_multiplier = seed_cost > 0 ? Math.floor(1000 / seed_cost) : 1;
 			planting_multiplier = Math.max(1, planting_multiplier);
 		}
 		
-		var harvest_yield = crop.harvest.min || 1;
-		var total_revenue = sell_price * harvest_yield * harvest_count * planting_multiplier;
-		var total_cost = crop.buy * planting_count * planting_multiplier;
-		var total_season_profit = total_revenue - total_cost;
-		var profit_per_day = round(total_season_profit / SEASON_DAYS, 1);
+		var total_days = season_count * SEASON_DAYS;
+		var total_season_profit = calculateMultiSeasonProfit(crop, 1, season_count, {
+			fertilizer: fertilizer,
+			avgSellPrice: avg_sell_price,
+			harvestYield: crop.harvest.min || 1,
+			plantingMultiplier: planting_multiplier,
+			profession: profession
+		});
+		var profit_per_day = round(total_season_profit / total_days, 1);
 		
 		return {
 			sellPrice: sell_price,
 			growthDays: growth_days,
+			avgSellPrice: avg_sell_price,
+			seasonCount: season_count,
+			totalDays: total_days,
 			totalSeasonProfit: total_season_profit,
 			profitPerDay: profit_per_day
 		};
 	}
 	
 	function refresh_crop_metrics(){
-		var settings = {profession: get_profession()};
+		var settings = {
+			profession: get_profession(),
+			farmingLevel: get_farming_level()
+		};
 		$.each(self.crops_list, function(i, crop){
-			var profit_data = calculateProfit(crop, settings);
-			var fixed_profit_data = calculateProfit(crop, {profession: settings.profession, useFixedBudget: true});
+			var season_count = Math.max(1, (crop.seasons || []).length || 1);
+			var profit_data = calculateProfit(crop, {
+				profession: settings.profession,
+				farmingLevel: settings.farmingLevel,
+				seasonCount: season_count
+			});
+			var fixed_profit_data = calculateProfit(crop, {
+				profession: settings.profession,
+				farmingLevel: settings.farmingLevel,
+				seasonCount: season_count,
+				useFixedBudget: true
+			});
 			crop.sellPrice = profit_data.sellPrice;
 			crop.growthDays = profit_data.growthDays;
 			crop.profitPerDay = profit_data.profitPerDay;
@@ -331,6 +607,7 @@ function planner_controller($scope){
 		self.player = new Player;
 		sync_profession_from_player();
 		apply_profession_to_player();
+		apply_farming_level_to_player();
 		self.planner_modal  = $("#crop_planner");
 		
 		for (var i = 0; i < self.days.length; i++) self.days[i] = i + 1;
@@ -536,7 +813,11 @@ function planner_controller($scope){
 			
 			$.each(plans, function(i, plan){
 				var crop = plan.crop;
-				var planting_cost = plan.get_cost();
+				var planting_cost_breakdown = plan.get_cost_breakdown();
+				var planting_cost = planting_cost_breakdown.totalCost;
+				plan.seedCost = planting_cost_breakdown.seedCost;
+				plan.fertilizerCost = planting_cost_breakdown.fertilizerCost;
+				plan.totalCost = planting_cost_breakdown.totalCost;
 				var season = self.seasons[Math.floor((plan.date-1)/SEASON_DAYS)];
 				var crop_end = crop.end;
 				
@@ -557,6 +838,9 @@ function planner_controller($scope){
 				
 				// Update seasonal number of plantings
 				s_plant_total.plantings += plan.amount;
+				
+				var fert_effect = get_fertilizer_effect(plan.fertilizer);
+				plan.waterRetentionChance = fert_effect.waterRetention || 0;
 				
 				var lifecycle = getCropLifecycle(crop, date, crop_end, plan.fertilizer);
 				if (!lifecycle.length) return;
@@ -646,7 +930,8 @@ function planner_controller($scope){
 			var gold = parseInt(match[1] || 0);
 			var crop = self.crops[self.newplan.crop_id];
 			if (!crop) return;
-			amount = Math.floor(gold / crop.buy);
+			var seed_cost = get_seed_cost(crop);
+			amount = seed_cost > 0 ? Math.floor(gold / seed_cost) : 1;
 			amount = amount || 1;
 			self.newplan.amount = amount;
 			return;
@@ -848,52 +1133,11 @@ function planner_controller($scope){
 		self.cinfo_settings.order = descending_keys[key] ? true : false;
 	}
 	
-	function getGrowthModifier(fertilizerName){
-		if (!fertilizerName) return 1;
-		
-		switch((fertilizerName + "").toLowerCase()){
-			case "speed-gro":
-			case "speed gro":
-			case "speed_gro":
-				return 0.9;
-			case "deluxe speed-gro":
-			case "delux speed-gro":
-			case "deluxe speed gro":
-			case "delux speed gro":
-			case "deluxe_speed_gro":
-			case "delux_speed_gro":
-				return 0.75;
-			default:
-				return 1;
-		}
-	}
-	
-	function getCropLifecycle(crop, plantDay, maxDay, currentFertilizer){
+	function getCropLifecycle(crop, plantDay, maxDay, currentFertilizer, professionOverride){
 		if (!crop || !plantDay) return [];
 		
-		var growthDays = crop.growthDays;
-		if (!growthDays && crop.stages && crop.stages.length){
-			growthDays = 0;
-			for (var i = 0; i < crop.stages.length; i++){
-				growthDays += crop.stages[i];
-			}
-		}
-		
-		var fertilizerName = "";
-		if (currentFertilizer){
-			fertilizerName = currentFertilizer.id || currentFertilizer.name || "";
-		}
-		var modifier = getGrowthModifier(fertilizerName);
-		growthDays = parseInt(growthDays || 0);
-		if (isNaN(growthDays) || growthDays < 1) growthDays = 1;
-		growthDays = Math.max(1, Math.floor(growthDays * modifier));
-		
-		var regrowDays = crop.regrowDays;
-		if (regrowDays === null || typeof regrowDays == "undefined"){
-			regrowDays = crop.regrow;
-		}
-		regrowDays = parseInt(regrowDays);
-		if (isNaN(regrowDays)) regrowDays = -1;
+		var growthDays = get_growth_days_with_modifiers(crop, currentFertilizer, professionOverride || get_profession());
+		var regrowDays = get_crop_regrow_days(crop);
 		
 		var limitDay = maxDay;
 		if (typeof limitDay != "number"){
@@ -923,6 +1167,57 @@ function planner_controller($scope){
 		}
 		
 		return lifecycle;
+	}
+	
+	function calculateMultiSeasonProfit(crop, plantDay, seasonCount, options){
+		options = options || {};
+		if (!crop) return 0;
+		
+		plantDay = parseInt(plantDay, 10);
+		if (isNaN(plantDay) || plantDay < 1) plantDay = 1;
+		
+		seasonCount = parseInt(seasonCount, 10);
+		if (isNaN(seasonCount) || seasonCount < 1) seasonCount = 1;
+		
+		var totalDays = seasonCount * SEASON_DAYS;
+		var limitDay = plantDay + totalDays - 1;
+		var regrowDays = get_crop_regrow_days(crop);
+		
+		var plantingMultiplier = parseInt(options.plantingMultiplier, 10);
+		if (isNaN(plantingMultiplier) || plantingMultiplier < 1) plantingMultiplier = 1;
+		
+		var harvestYield = parseFloat(options.harvestYield);
+		if (isNaN(harvestYield) || harvestYield <= 0){
+			harvestYield = (crop.harvest && crop.harvest.min) ? crop.harvest.min : 1;
+		}
+		
+		var avgSellPrice = options.avgSellPrice;
+		if (typeof avgSellPrice != "number"){
+			avgSellPrice = get_average_sell_price(crop.sell || 0, get_farming_level(), options.fertilizer);
+		}
+		
+		var harvestValue = avgSellPrice * harvestYield * plantingMultiplier;
+		var plantingCost = get_total_planting_cost(crop, options.fertilizer, plantingMultiplier).totalCost;
+		
+		var totalProfit = 0;
+		var currentPlantDay = plantDay;
+		while (currentPlantDay <= limitDay){
+			var lifecycle = getCropLifecycle(crop, currentPlantDay, limitDay, options.fertilizer, options.profession);
+			if (!lifecycle.length) break;
+			
+			totalProfit -= plantingCost;
+			$.each(lifecycle, function(i, event){
+				if (event.type == "harvest" && event.day <= limitDay){
+					totalProfit += harvestValue;
+				}
+			});
+			
+			// Regrowing crops only pay seed cost once.
+			if (regrowDays > 0) break;
+			currentPlantDay = lifecycle[0].day;
+		}
+		
+		return totalProfit;
 	}
 	
 	// Filter crops that can be planted in the planner's drop down list
@@ -1172,7 +1467,9 @@ function planner_controller($scope){
 				self.tiller = true;
 				self.agriculturist = false;
 			}
-			if (pdata.level) self.level = pdata.level;
+			if (typeof pdata.level != "undefined"){
+				self.level = clamp_farming_level(pdata.level);
+			}
 			if (pdata.settings) self.settings = pdata.settings;
 		}
 		
@@ -1183,7 +1480,7 @@ function planner_controller($scope){
 			if (self.tiller) pdata.tiller = self.tiller;
 			if (self.agriculturist) pdata.agriculturist = self.agriculturist;
 			pdata.settings = self.settings;
-			pdata.level = self.level;
+			pdata.level = clamp_farming_level(self.level);
 			SAVE_JSON("player", pdata);
 		}
 		
@@ -1214,15 +1511,17 @@ function planner_controller($scope){
 		// [SOURCE: StardewValley/Crop.cs : function harvest]
 		function quality_chance(quality, mult, locale){
 			quality = quality || 0;		// Default: check regular quality chance
-			mult = mult || 0;			// Multiplier given by type of fertilizer used (0, 1, or 2)
+			mult = mult || 0;			// Fertilizer quality bonus (0-1)
 			
-			var gold_chance = 0.2 * (self.level / 10) + 0.2 * mult * ((self.level + 2) / 12) + 0.01;
-			var silver_chance = Math.min(0.75, gold_chance * 2);
+			var distribution = get_quality_distribution(self.level, mult);
+			var gold_chance = distribution.gold;
+			var silver_chance = distribution.silver;
+			var regular_chance = distribution.normal;
 			
 			var chance = 0;
 			switch (quality){
 				case 0:
-					chance = Math.max(0, 1 - (gold_chance + silver_chance));
+					chance = regular_chance;
 					break;
 				case 1:
 					chance = Math.min(1, silver_chance);
@@ -1278,6 +1577,8 @@ function planner_controller($scope){
 		self.name;
 		self.sell;
 		self.buy;
+		self.seedPrice = 0;
+		self.seedCost = 0;
 		self.seasons = [];
 		self.stages = [];
 		self.regrow;
@@ -1310,12 +1611,18 @@ function planner_controller($scope){
 		
 		function init(){
 			if (!data) return;
+			var seed_price = Number(data.seedPrice);
+			if (isNaN(seed_price)) seed_price = Number(data.seedCost);
+			if (isNaN(seed_price)) seed_price = Number(data.buy);
+			if (isNaN(seed_price)) seed_price = 0;
 			
 			// Base properties
 			self.id = data.id;
 			self.name = data.name;
 			self.sell = data.sell;
-			self.buy = data.buy;
+			self.seedPrice = seed_price;
+			self.seedCost = seed_price;
+			self.buy = seed_price;
 			self.seasons = data.seasons;
 			self.stages = data.stages;
 			self.regrow = data.regrow;
@@ -1518,6 +1825,7 @@ function planner_controller($scope){
 		// Add plan
 		var plan = new Plan(newplan.get_data(), planner.in_greenhouse());
 		plan.date = date;
+		plan.get_cost_breakdown();
 		this.farm().plans[date].push(plan);
 		
 		// Auto-replanting within current year
@@ -1660,26 +1968,17 @@ function planner_controller($scope){
 			self.yield.max = (Math.min(crop.harvest.min + 1, crop.harvest.max + 1 + (planner.player.level / crop.harvest.level_increase))-1) * plan.amount;
 			
 			// Harvest revenue and costs
-			var q_mult = 0;
-			if (plan.fertilizer && !plan.fertilizer.is_none()){
-				switch (plan.fertilizer.id){
-					case "basic_fertilizer":
-						q_mult = 1;
-						break;
-					case "quality_fertilizer":
-						q_mult = 2;
-						break;
-				}
-			}
+			var fert_effect = get_fertilizer_effect(plan.fertilizer);
+			var quality_bonus = fert_effect.qualityBonus || 0;
 			
 			// Fertilizers expire at the beginning of a new season in the greenhouse
 			if (self.plan.greenhouse && (planner.get_season(self.date) != planner.get_season(self.plan.date)))
-				q_mult = 0;
+				quality_bonus = 0;
 			
 			// Calculate min/max revenue based on regular/silver/gold chance
-			var regular_chance = planner.player.quality_chance(0, q_mult);
-			var silver_chance = planner.player.quality_chance(1, q_mult);
-			var gold_chance = planner.player.quality_chance(2, q_mult);
+			var regular_chance = planner.player.quality_chance(0, quality_bonus);
+			var silver_chance = planner.player.quality_chance(1, quality_bonus);
+			var gold_chance = planner.player.quality_chance(2, quality_bonus);
 			
 			var min_revenue = crop.get_sell(0);
 			var max_revenue = (min_revenue*regular_chance) + (crop.get_sell(1)*silver_chance) + (crop.get_sell(2)*gold_chance);
@@ -1689,7 +1988,12 @@ function planner_controller($scope){
 			// and not to extra dropped yields
 			self.revenue.min = Math.floor(min_revenue) * self.yield.min;
 			self.revenue.max = Math.floor(max_revenue) + (Math.floor(min_revenue) * Math.max(0, self.yield.max - 1));
-			self.cost = crop.buy * plan.amount;
+			if (typeof plan.totalCost == "number" && !isNaN(plan.totalCost)){
+				self.cost = plan.totalCost;
+			} else {
+				var cost_breakdown = plan.get_cost_breakdown();
+				self.cost = cost_breakdown.totalCost;
+			}
 			
 			// Tiller profession (ID 1)
 			// [SOURCE: StardewValley/Object.cs : function sellToStorePrice]
@@ -1705,24 +2009,27 @@ function planner_controller($scope){
 			}
 			
 			// Harvest profit
-			self.profit.min = self.revenue.min - self.cost;
-			self.profit.max = self.revenue.max - self.cost;
+			var net_profit_min = self.revenue.min - self.cost;
+			var net_profit_max = self.revenue.max - self.cost;
+			self.profit.min = clean_zero(net_profit_min);
+			self.profit.max = clean_zero(net_profit_max);
 		}
 	}
 	
 	Harvest.prototype.get_cost = function(locale){
-		if (locale) return this.cost.toLocaleString();
-		return this.cost;
+		var value = clean_zero(this.cost);
+		if (locale) return value.toLocaleString();
+		return value;
 	};
 	
 	Harvest.prototype.get_revenue = function(locale, max){
-		var value = max ? this.revenue.max : this.revenue.min;
+		var value = clean_zero(max ? this.revenue.max : this.revenue.min);
 		if (locale) return value.toLocaleString();
 		return value;
 	};
 	
 	Harvest.prototype.get_profit = function(locale, max){
-		var value = max ? this.profit.max : this.profit.min;
+		var value = clean_zero(max ? this.profit.max : this.profit.min);
 		if (locale) return value.toLocaleString();
 		return value;
 	};
@@ -1738,6 +2045,10 @@ function planner_controller($scope){
 		self.crop = {};
 		self.amount = 1;
 		self.fertilizer = planner.fertilizer["none"];
+		self.waterRetentionChance = 0;
+		self.seedCost = 0;
+		self.fertilizerCost = 0;
+		self.totalCost = 0;
 		self.harvests = [];
 		self.greenhouse = false;
 		
@@ -1752,6 +2063,12 @@ function planner_controller($scope){
 			self.amount = data.amount;
 			if (data.fertilizer && planner.fertilizer[data.fertilizer])
 				self.fertilizer = planner.fertilizer[data.fertilizer];
+			var fert_effect = get_fertilizer_effect(self.fertilizer);
+			self.waterRetentionChance = fert_effect.waterRetention || 0;
+			var cost_breakdown = get_total_planting_cost(self.crop, self.fertilizer, self.amount);
+			self.seedCost = cost_breakdown.seedCost;
+			self.fertilizerCost = cost_breakdown.fertilizerCost;
+			self.totalCost = cost_breakdown.totalCost;
 			self.greenhouse = in_greenhouse ? true : false;
 		}
 	}
@@ -1766,58 +2083,47 @@ function planner_controller($scope){
 	};
 	
 	Plan.prototype.get_grow_time = function(){
-		var stages = $.extend([], this.crop.stages);
-		
-		if (this.fertilizer.id == "speed_gro" || this.fertilizer.id == "delux_speed_gro" || planner.player.agriculturist){
-			// [SOURCE: StardewValley.TerrainFeatures/HoeDirt.cs : function plant]
-			var rate = 0;
-			switch (this.fertilizer.id){
-				case "speed_gro":
-					rate = 0.1;
-					break;
-				case "delux_speed_gro":
-					rate = 0.25;
-					break;
-			}
-			
-			// Agriculturist profession (ID 5)
-			if (planner.player.agriculturist) rate += 0.1;
-			
-			// Days to remove
-			var remove_days = Math.ceil(this.crop.grow * rate);
-			
-			// For removing more than one day from larger stages of growth
-			// when there are still days to remove
-			var multi_remove = 0;
-			
-			// Remove days from stages
-			while (remove_days > 0 && multi_remove < 3){
-				for (var i = 0; i < stages.length; i++){
-					if (i > 0 || stages[i] > 1){
-						stages[i] -= 1;
-						remove_days--;
-					}
-					
-					if (remove_days <= 0) break;
-				}
-				
-				multi_remove++;
-			}
+		return get_growth_days_with_modifiers(this.crop, this.fertilizer, planner.player.profession);
+	};
+	
+	Plan.prototype.get_display_cost = function(locale){
+		var display_cost;
+		if (typeof this.totalCost == "number" && !isNaN(this.totalCost)){
+			display_cost = this.totalCost;
+		} else {
+			var breakdown = get_total_planting_cost(this.crop, this.fertilizer, this.amount);
+			this.seedCost = breakdown.seedCost;
+			this.fertilizerCost = breakdown.fertilizerCost;
+			this.totalCost = breakdown.totalCost;
+			display_cost = breakdown.totalCost;
 		}
 		
-		// Add up days of growth
-		var days = 0;
-		for (var i = 0; i < stages.length; i++){
-			days += stages[i];
+		if ((typeof display_cost != "number" || isNaN(display_cost)) && this.crop){
+			var amount = parseInt(this.amount, 10);
+			if (isNaN(amount) || amount < 1) amount = 1;
+			display_cost = (Number(this.crop.seedCost) || 0) * amount;
 		}
 		
-		return days;
+		if (typeof display_cost != "number" || isNaN(display_cost)){
+			display_cost = 0;
+		}
+		
+		display_cost = display_cost === 0 ? 0 : display_cost;
+		display_cost = clean_zero(display_cost);
+		if (locale) return display_cost.toLocaleString();
+		return display_cost;
+	};
+	
+	Plan.prototype.get_cost_breakdown = function(){
+		var breakdown = get_total_planting_cost(this.crop, this.fertilizer, this.amount);
+		this.seedCost = breakdown.seedCost;
+		this.fertilizerCost = breakdown.fertilizerCost;
+		this.totalCost = breakdown.totalCost;
+		return breakdown;
 	};
 	
 	Plan.prototype.get_cost = function(locale){
-		var amount = this.crop.buy * this.amount;
-		if (locale) return amount.toLocaleString();
-		return amount;
+		return this.get_display_cost(locale);
 	};
 	
 	Plan.prototype.get_revenue = function(locale, max){
@@ -1825,12 +2131,14 @@ function planner_controller($scope){
 		for (var i = 0; i < this.harvests.length; i++){
 			amount += max ? this.harvests[i].revenue.max : this.harvests[i].revenue.min;
 		}
+		amount = clean_zero(amount);
 		if (locale) return amount.toLocaleString();
 		return amount;
 	};
 	
 	Plan.prototype.get_profit = function(locale, max){
 		var amount = this.get_revenue(max) - this.get_cost();
+		amount = clean_zero(amount);
 		if (locale) return amount.toLocaleString();
 		return amount;
 	};
@@ -1868,7 +2176,12 @@ function planner_controller($scope){
 	
 	// Get fertilizer image
 	Fertilizer.prototype.get_image = function(){
-		if (!this.is_none()) return "images/fertilizer/" + this.id + ".png";
+		if (this.is_none()) return;
+		var normalized_name = normalize_fertilizer_image_name(this.name || this.id);
+		if (fertilizerImageAliases[normalized_name]){
+			normalized_name = fertilizerImageAliases[normalized_name];
+		}
+		return "images/fertilizer/" + normalized_name + ".png";
 	};
 	
 	
@@ -1887,20 +2200,21 @@ function planner_controller($scope){
 	
 	// Return cost value
 	Finance.prototype.get_cost = function(locale){
-		if (locale) return this.cost.toLocaleString();
-		return this.cost;
+		var value = clean_zero(this.cost);
+		if (locale) return value.toLocaleString();
+		return value;
 	};
 	
 	// Return revenue value (min or max)
 	Finance.prototype.get_revenue = function(locale, max){
-		var value = max ? this.revenue.max : this.revenue.min;
+		var value = clean_zero(max ? this.revenue.max : this.revenue.min);
 		if (locale) return value.toLocaleString();
 		return value;
 	};
 	
 	// Return profit value (min or max)
 	Finance.prototype.get_profit = function(locale, max){
-		var value = max ? this.profit.max : this.profit.min;
+		var value = clean_zero(max ? this.profit.max : this.profit.min);
 		if (locale) return value.toLocaleString();
 		return value;
 	};
