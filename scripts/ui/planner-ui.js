@@ -32,6 +32,12 @@ import {
 import { createPlannerState } from "../core/planner-state.js";
 import { round, clean_zero } from "../utils/math.js";
 import { formatNumber } from "../utils/format.js";
+import {
+	LATE_GAME_CROPS,
+	getBestCropByProfitPerTile,
+	getBestCropByProfitPerDay,
+	generateOptimalPlan
+} from "../core/optimizer.js";
 
 const $ = window.jQuery || window.$;
 let dataLoaderFn = defaultDataLoader;
@@ -138,6 +144,7 @@ function planner_controller($scope){
 	self.is_best_crop = is_best_crop;
 	self.set_profession = set_profession;
 	self.calculateMultiSeasonProfit = calculateMultiSeasonProfit;
+	self.refresh_optimizer = refreshOptimizer;
 	
 	// Dashboard, tooltip, and history actions exposed to templates
 	self.undo = undo;
@@ -164,6 +171,25 @@ function planner_controller($scope){
 	let cropsData = [];
 	self.best_crop_id = null;
 	self.playerSettings = plannerState.get("playerSettings");
+	self.optimizer = {
+		inputs: {
+			tiles: 120,
+			daysRemaining: SEASON_DAYS,
+			seasonId: "spring",
+			excludeLateGame: false
+		},
+		results: {
+			bestByTile: null,
+			bestByDay: null,
+			plan: {
+				allocations: [],
+				totalExpectedProfit: 0,
+				strategy: "greedy-profit-per-day"
+			}
+		},
+		eligibleCount: 0,
+		error: ""
+	};
 	
 	$scope.$watch(function(){
 		return self.player ? self.player.level : null;
@@ -263,6 +289,131 @@ function planner_controller($scope){
 	// Dashboard helper: recompute current view and rerender.
 	function refreshProfitDashboard(){
 		updateProfitDashboard(getProfitDashboardSummary());
+	}
+	
+	// Optimizer helper: reset recommendation results to an empty state.
+	function resetOptimizerResults(){
+		self.optimizer.results = {
+			bestByTile: null,
+			bestByDay: null,
+			plan: {
+				allocations: [],
+				totalExpectedProfit: 0,
+				strategy: "greedy-profit-per-day"
+			}
+		};
+	}
+	
+	// Optimizer helper: sanitize user-entered optimization constraints.
+	function sanitizeOptimizerInputs(){
+		var inputs = self.optimizer.inputs || {};
+		var tiles = parseInt(inputs.tiles, 10);
+		if (isNaN(tiles) || tiles <= 0) tiles = 1;
+		
+		var days_remaining = parseInt(inputs.daysRemaining, 10);
+		if (isNaN(days_remaining)) days_remaining = SEASON_DAYS;
+		if (days_remaining > SEASON_DAYS) days_remaining = SEASON_DAYS;
+		if (days_remaining < 0) days_remaining = 0;
+		
+		var season_id = (inputs.seasonId || (self.cseason && self.cseason.id) || "spring") + "";
+		season_id = season_id.toLowerCase();
+		var exclude_late_game = inputs.excludeLateGame ? true : false;
+		
+		self.optimizer.inputs.tiles = tiles;
+		self.optimizer.inputs.daysRemaining = days_remaining;
+		self.optimizer.inputs.seasonId = season_id;
+		self.optimizer.inputs.excludeLateGame = exclude_late_game;
+		
+		return {
+			tiles: tiles,
+			daysRemaining: days_remaining,
+			seasonId: season_id,
+			excludeLateGame: exclude_late_game
+		};
+	}
+	
+	// Optimizer helper: build ephemeral optimizer candidates from existing crop metrics.
+	function buildOptimizerCandidates(){
+		var candidates = [];
+		$.each(self.crops_list || [], function(i, crop){
+			if (!crop || !crop.name) return;
+			
+			var growth_days = parseInt(crop.growthDays, 10);
+			if (isNaN(growth_days) || growth_days <= 0) return;
+			
+			var regrow_days = parseInt(crop.regrowDays || crop.regrow, 10);
+			if (isNaN(regrow_days)) regrow_days = -1;
+			
+			var profit_per_day_value = Number(crop.profitPerDay);
+			if (isNaN(profit_per_day_value)) return;
+			
+			// netProfit is derived from existing computed metrics only.
+			var net_profit = clean_zero(round(profit_per_day_value * growth_days, 1));
+			candidates.push({
+				name: crop.name,
+				growthDays: growth_days,
+				totalGrowthDays: growth_days,
+				regrowDays: regrow_days,
+				profitPerDayValue: profit_per_day_value,
+				netProfit: net_profit,
+				sourceCrop: crop
+			});
+		});
+		return candidates;
+	}
+	
+	// Optimizer helper: apply season/mode/days constraints to candidate crops.
+	function filterOptimizerCandidatesBySeasonAndDays(candidates){
+		var inputs = sanitizeOptimizerInputs();
+		var season_id = inputs.seasonId;
+		var days_remaining = inputs.daysRemaining;
+		if (days_remaining <= 0) return [];
+		
+		return (candidates || []).filter(function(candidate){
+			if (!candidate || candidate.growthDays > days_remaining) return false;
+			
+			// Farm mode respects optimizer season selector; greenhouse bypasses seasons.
+			if (!self.in_greenhouse()){
+				var crop_seasons = (candidate.sourceCrop && candidate.sourceCrop.seasons) || [];
+				if (crop_seasons.indexOf(season_id) == -1) return false;
+			}
+			
+			// Optional optimizer filter for late-game crops.
+			if (inputs.excludeLateGame && LATE_GAME_CROPS.indexOf(candidate.name) != -1){
+				return false;
+			}
+			return true;
+		});
+	}
+	
+	// Optimizer helper: recompute recommendations without mutating planner logic/state.
+	function refreshOptimizer(){
+		if (!self.optimizer) return;
+		var inputs = sanitizeOptimizerInputs();
+		self.optimizer.error = "";
+		
+		if (inputs.daysRemaining <= 0){
+			self.optimizer.eligibleCount = 0;
+			resetOptimizerResults();
+			self.optimizer.error = "No harvest window available for the selected days.";
+			return;
+		}
+		
+		var candidates = buildOptimizerCandidates();
+		var eligible_candidates = filterOptimizerCandidatesBySeasonAndDays(candidates);
+		self.optimizer.eligibleCount = eligible_candidates.length;
+		
+		if (!eligible_candidates.length){
+			resetOptimizerResults();
+			self.optimizer.error = "No feasible crops for the selected constraints.";
+			return;
+		}
+		
+		self.optimizer.results = {
+			bestByTile: getBestCropByProfitPerTile(eligible_candidates),
+			bestByDay: getBestCropByProfitPerDay(eligible_candidates),
+			plan: generateOptimalPlan(eligible_candidates, inputs.tiles, inputs.daysRemaining)
+		};
 	}
 	
 	// Tooltip helper: return reusable tooltip element.
@@ -394,6 +545,9 @@ function planner_controller($scope){
 		cseason_index = Math.max(0, Math.min(cseason_index, self.seasons.length - 1));
 		self.cseason = self.seasons[cseason_index];
 		plannerState.set("currentSeasonIndex", cseason_index);
+		if (self.cseason && self.cseason.id){
+			self.optimizer.inputs.seasonId = self.cseason.id;
+		}
 		
 		self.newplan = new Plan;
 		self.editplan = null;
@@ -401,6 +555,7 @@ function planner_controller($scope){
 		update(self.years[0].data.farm, true);
 		update(self.years[0].data.greenhouse, true);
 		refreshProfitDashboard();
+		refreshOptimizer();
 		hide_crop_tooltip();
 		return true;
 	}
@@ -573,6 +728,7 @@ function planner_controller($scope){
 			crop.profit = profit_data.profitPerDay;
 			crop.fixed_profit = fixed_profit_data.profitPerDay;
 		});
+		refreshOptimizer();
 	}
 	
 	function get_crop_sort_value(crop, sort_key){
@@ -663,6 +819,7 @@ function planner_controller($scope){
 		for (var i = 0; i < self.days.length; i++) self.days[i] = i + 1;
 		self.seasons = [new Season(0), new Season(1), new Season(2), new Season(3)];
 		self.cseason = self.seasons[0];
+		self.optimizer.inputs.seasonId = self.cseason.id;
 		plannerState.set("currentSeasonIndex", self.cseason.index);
 		self.cinfo_settings.season_options = [self.seasons[0], self.seasons[1], self.seasons[2]];
 		
@@ -759,6 +916,7 @@ function planner_controller($scope){
 			refreshProfitDashboard();
 			
 			self.loaded = true;
+			refreshOptimizer();
 			$scope.$apply();
 		}).catch(function(error){
 			alert("An error occurred in loading planner data. Check the browser console.");
@@ -1112,8 +1270,12 @@ function planner_controller($scope){
 	function set_season(index){
 		self.cseason = self.seasons[index];
 		plannerState.set("currentSeasonIndex", self.cseason ? self.cseason.index : 0);
+		if (self.cseason && self.cseason.id){
+			self.optimizer.inputs.seasonId = self.cseason.id;
+		}
 		self.newplan.crop_id = null;
 		refreshProfitDashboard();
+		refreshOptimizer();
 	}
 	
 	// Get current farm object of current year
@@ -1141,6 +1303,7 @@ function planner_controller($scope){
 		self.cmode = mode;
 		plannerState.set("currentMode", self.cmode);
 		refreshProfitDashboard();
+		refreshOptimizer();
 	}
 	
 	////////////////////////////////

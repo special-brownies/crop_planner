@@ -86,10 +86,6 @@
 				</div>
 				
 				<div class="col-md-2 col-md-offset-1 col-xs-4 clear_buttons">
-					<!-- [HISTORY_BUTTONS] -->
-					<button id="undo-btn" type="button" class="btn btn-default btn-block" ng-click="self.undo()" ng-disabled="!self.can_undo()"><i class="fa fa-undo"></i> Undo</button>
-					<button id="redo-btn" type="button" class="btn btn-default btn-block" ng-click="self.redo()" ng-disabled="!self.can_redo()"><i class="fa fa-repeat"></i> Redo</button>
-					<!-- [/HISTORY_BUTTONS] -->
 					<div class="btn btn-default btn-block" ng-click="self.clear_season(self.cseason)"><i class="fa fa-calendar"></i> Clear {{self.cseason.name}}</div>
 					<div class="btn btn-default btn-block" ng-click="self.clear_year(self.cyear)"><i class="fa fa-trash"></i> Clear Year</div>
 				</div>
@@ -195,6 +191,9 @@
 		<ul class="sb_buttons">
 			<li ng-click="self.sidebar.open('cropinfo')" ng-class="{'active': self.sidebar.mode == 'cropinfo'}" title="Crop Info">
 				<i class="fa fa-pagelines"></i>
+			</li>
+			<li id="optimizer-toggle" class="sidebar-btn" ng-click="self.sidebar.open('optimizer')" ng-class="{'active': self.sidebar.mode == 'optimizer'}" title="Optimizer">
+				<i class="fa fa-line-chart"></i>
 			</li>
 			<li ng-click="self.sidebar.open('settings')"  ng-class="{'active': self.sidebar.mode == 'settings'}" title="Settings">
 				<i class="fa fa-gear"></i>
@@ -327,6 +326,87 @@
 			</div>
 			<!-- [/SB_CROP_INFO] -->
 			
+			<!-- [SB_OPTIMIZER] -->
+			<div id="sb_optimizer" class="panel panel-default sb_section" ng-class="{'active': self.sidebar.mode == 'optimizer'}">
+				<div class="panel-heading">
+					<div class="back" ng-click="self.sidebar.back()"><i class="fa fa-chevron-left" ></i></div>
+					<h3 class="panel-title">Crop Optimizer</h3>
+				</div>
+				<div class="panel-body">
+					<div class="optimizer-inputs">
+						<label>
+							Tiles
+							<input type="number" class="form-control" min="1" ng-model="self.optimizer.inputs.tiles" ng-change="self.refresh_optimizer()">
+						</label>
+						<label>
+							Days Remaining
+							<input type="number" class="form-control" min="1" max="28" ng-model="self.optimizer.inputs.daysRemaining" ng-change="self.refresh_optimizer()">
+						</label>
+						<label>
+							Season
+							<select class="form-control" ng-model="self.optimizer.inputs.seasonId" ng-change="self.refresh_optimizer()">
+								<option value="spring">Spring</option>
+								<option value="summer">Summer</option>
+								<option value="fall">Fall</option>
+								<option value="winter">Winter</option>
+							</select>
+						</label>
+						<label class="optimizer-toggle">
+							<input type="checkbox" id="exclude-lategame" ng-model="self.optimizer.inputs.excludeLateGame" ng-change="self.refresh_optimizer()">
+							Exclude late-game crops
+						</label>
+					</div>
+					
+					<div class="optimizer-status text-muted" ng-show="self.optimizer.eligibleCount > 0">
+						Eligible crops: {{self.optimizer.eligibleCount}}
+					</div>
+					
+					<div class="optimizer-status text-muted" ng-show="self.optimizer.inputs.excludeLateGame">
+						Late-game crops excluded
+					</div>
+					
+					<div class="optimizer-empty text-muted" ng-show="!self.crops_list.length">
+						No recommendations available yet.
+					</div>
+					
+					<div class="optimizer-empty text-muted" ng-show="self.crops_list.length && self.optimizer.error">
+						{{self.optimizer.error}}
+					</div>
+					
+					<div class="optimizer-results" ng-show="self.crops_list.length && !self.optimizer.error">
+						<div class="optimizer-result">
+							<strong>Best Crop (Profit/Tile):</strong>
+							<span ng-show="self.optimizer.results.bestByTile">
+								{{self.optimizer.results.bestByTile.name}} ({{self.optimizer.results.bestByTile.netProfit | number:1}}g/tile)
+							</span>
+							<span ng-show="!self.optimizer.results.bestByTile">N/A</span>
+						</div>
+						<div class="optimizer-result">
+							<strong>Best Crop (Profit/Day):</strong>
+							<span ng-show="self.optimizer.results.bestByDay">
+								{{self.optimizer.results.bestByDay.name}} ({{self.optimizer.results.bestByDay.profitPerDayValue | number:1}}g/day)
+							</span>
+							<span ng-show="!self.optimizer.results.bestByDay">N/A</span>
+						</div>
+						<div class="optimizer-result">
+							<strong>Suggested Plan:</strong>
+							<div class="optimizer-plan" ng-show="self.optimizer.results.plan.allocations.length">
+								<div class="allocation" ng-repeat="allocation in self.optimizer.results.plan.allocations">
+									{{allocation.cropName}}: {{allocation.tilesAssigned}} tiles, {{allocation.expectedProfit | number:1}}g expected ({{allocation.profitPerDay | number:1}}g/day)
+								</div>
+								<div class="optimizer-total">
+									Total expected profit: {{self.optimizer.results.plan.totalExpectedProfit | number:1}}g
+								</div>
+							</div>
+							<div class="optimizer-empty text-muted" ng-show="!self.optimizer.results.plan.allocations.length">
+								No feasible crops for selected constraints.
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+			<!-- [/SB_OPTIMIZER] -->
+			
 			
 			<!-- [SB_SETTINGS] -->
 			<div id="sb_settings" class="panel panel-default sb_section" ng-class="{'active': self.sidebar.mode == 'settings'}">
@@ -375,6 +455,11 @@
 					<div>
 						<h4>Miscellaneous</h4>
 						<label><input type="checkbox" ng-model="self.player.settings.show_events"> Show events on calendar</label>
+						
+						<div class="history-actions settings-row">
+							<button id="undo-btn-settings" type="button" class="btn btn-default" ng-click="self.undo()" ng-disabled="!self.can_undo()"><i class="fa fa-undo"></i> Undo</button>
+							<button id="redo-btn-settings" type="button" class="btn btn-default" ng-click="self.redo()" ng-disabled="!self.can_redo()"><i class="fa fa-repeat"></i> Redo</button>
+						</div>
 						
 						<br><br>
 						
