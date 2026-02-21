@@ -86,6 +86,10 @@
 				</div>
 				
 				<div class="col-md-2 col-md-offset-1 col-xs-4 clear_buttons">
+					<!-- [HISTORY_BUTTONS] -->
+					<button id="undo-btn" type="button" class="btn btn-default btn-block" ng-click="self.undo()" ng-disabled="!self.can_undo()"><i class="fa fa-undo"></i> Undo</button>
+					<button id="redo-btn" type="button" class="btn btn-default btn-block" ng-click="self.redo()" ng-disabled="!self.can_redo()"><i class="fa fa-repeat"></i> Redo</button>
+					<!-- [/HISTORY_BUTTONS] -->
 					<div class="btn btn-default btn-block" ng-click="self.clear_season(self.cseason)"><i class="fa fa-calendar"></i> Clear {{self.cseason.name}}</div>
 					<div class="btn btn-default btn-block" ng-click="self.clear_year(self.cyear)"><i class="fa fa-trash"></i> Clear Year</div>
 				</div>
@@ -114,6 +118,9 @@
 			</div>
 			<!-- [/SEASON_PICKER] -->
 			
+			<!-- [PROFIT_DASHBOARD] -->
+			<div id="profit-dashboard"></div>
+			<!-- [/PROFIT_DASHBOARD] -->
 			
 			<!-- [CALENDAR] -->
 			<div id="calendar">
@@ -248,7 +255,7 @@
 									</tr>
 								</thead>
 								<tbody>
-									<tr ng-repeat="crop in self.get_visible_crops()" class="crop" ng-class="{'best-crop': self.is_best_crop(crop)}" ng-click="self.sidebar.open_crop(crop)">
+									<tr ng-repeat="crop in self.get_visible_crops()" class="crop" ng-class="{'best-crop': self.is_best_crop(crop)}" ng-click="self.sidebar.open_crop(crop)" ng-mouseenter="self.show_crop_tooltip($event, crop)" ng-mousemove="self.move_crop_tooltip($event)" ng-mouseleave="self.hide_crop_tooltip()">
 										<td width="1"><img ng-src="{{crop.get_image()}}"></td>
 										<td class="name">
 											{{crop.name}}
@@ -558,6 +565,10 @@
 		</div>
 	</div>
 	<!-- [/CROP_PLANNER_MODAL] -->
+	
+	<!-- [CROP_TOOLTIP] -->
+	<div id="tooltip" class="planner-tooltip hidden"></div>
+	<!-- [/CROP_TOOLTIP] -->
 	
 	
 	<!-- [LICENSE] -->

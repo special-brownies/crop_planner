@@ -287,6 +287,10 @@ function planner_controller($scope){
 	self.newplan;
 	self.editplan;
 	
+	// Undo/redo history stack state
+	const historyStack = [];
+	const redoStack = [];
+	
 	// Core planner functions
 	self.update = update;
 	self.add_plan = add_plan;
@@ -315,6 +319,15 @@ function planner_controller($scope){
 	self.is_best_crop = is_best_crop;
 	self.set_profession = set_profession;
 	self.calculateMultiSeasonProfit = calculateMultiSeasonProfit;
+	
+	// Dashboard, tooltip, and history actions exposed to templates
+	self.undo = undo;
+	self.redo = redo;
+	self.can_undo = can_undo;
+	self.can_redo = can_redo;
+	self.show_crop_tooltip = show_crop_tooltip;
+	self.move_crop_tooltip = move_crop_tooltip;
+	self.hide_crop_tooltip = hide_crop_tooltip;
 	
 	// Crop info search/filter settings
 	self.cinfo_settings = {
@@ -353,6 +366,255 @@ function planner_controller($scope){
 		}
 		self.player.save();
 	});
+	
+	
+	/********************************
+		UI HELPERS
+	********************************/
+	// Dashboard helper: return a stable element reference by id.
+	function get_profit_dashboard_element(){
+		return document.getElementById("profit-dashboard");
+	}
+	
+	// Dashboard helper: format numbers without changing planner math.
+	function format_dashboard_value(value, decimals){
+		value = Number(value) || 0;
+		value = round(value, decimals || 0);
+		return value.toLocaleString(undefined, {
+			minimumFractionDigits: 0,
+			maximumFractionDigits: decimals || 0
+		});
+	}
+	
+	// Dashboard helper: read current season totals already computed by update().
+	function getProfitDashboardSummary(){
+		var summary = {
+			investment: 0,
+			revenue: 0,
+			net: 0,
+			perTile: 0,
+			roi: 0
+		};
+		
+		var farm = self.cfarm();
+		var season = self.cseason;
+		if (!farm || !season || !farm.plans || !farm.harvests || !farm.totals || !farm.totals.season){
+			return summary;
+		}
+		
+		for (var date = season.start; date <= season.end; date++){
+			var plans = farm.plans[date] || [];
+			for (var i = 0; i < plans.length; i++){
+				var plan = plans[i];
+				if (typeof plan.totalCost == "number" && !isNaN(plan.totalCost)){
+					summary.investment += plan.totalCost;
+				} else if (plan && plan.get_cost_breakdown){
+					summary.investment += plan.get_cost_breakdown().totalCost;
+				}
+			}
+			
+			var harvests = farm.harvests[date] || [];
+			for (var ii = 0; ii < harvests.length; ii++){
+				var harvest = harvests[ii];
+				summary.revenue += Number(harvest.revenue && harvest.revenue.min) || 0;
+			}
+		}
+		
+		var season_totals = farm.totals.season[season.index];
+		if (!season_totals) return summary;
+		var net = Number(season_totals.profit && season_totals.profit.min) || 0;
+		var plantings = Number(season_totals.plantings) || 0;
+		summary.net = clean_zero(net);
+		summary.perTile = plantings > 0 ? clean_zero(round(net / plantings, 1)) : 0;
+		summary.roi = summary.investment > 0 ? clean_zero(round((net / summary.investment) * 100, 1)) : 0;
+		return summary;
+	}
+	
+	// Dashboard helper: render summary cards in one place.
+	function updateProfitDashboard(summary){
+		var dashboard = get_profit_dashboard_element();
+		if (!dashboard) return;
+		
+		summary = summary || getProfitDashboardSummary();
+		dashboard.innerHTML = ""
+			+ "<div class='profit-card'>Investment: " + format_dashboard_value(summary.investment, 0) + "g</div>"
+			+ "<div class='profit-card'>Revenue: " + format_dashboard_value(summary.revenue, 0) + "g</div>"
+			+ "<div class='profit-card'>Net Profit: " + format_dashboard_value(summary.net, 0) + "g</div>"
+			+ "<div class='profit-card'>Profit/Tile: " + format_dashboard_value(summary.perTile, 1) + "g</div>"
+			+ "<div class='profit-card'>ROI: " + format_dashboard_value(summary.roi, 1) + "%</div>";
+	}
+	
+	// Dashboard helper: recompute current view and rerender.
+	function refreshProfitDashboard(){
+		updateProfitDashboard(getProfitDashboardSummary());
+	}
+	
+	// Tooltip helper: return reusable tooltip element.
+	function get_tooltip_element(){
+		return document.getElementById("tooltip");
+	}
+	
+	// Tooltip helper: show crop details when a row is hovered.
+	function show_crop_tooltip(event, crop){
+		var tooltip = get_tooltip_element();
+		if (!tooltip || !crop) return;
+		
+		var regrow_days = parseInt(crop.regrowDays || crop.regrow, 10);
+		var regrow_display = (isNaN(regrow_days) || regrow_days <= 0) ? "None" : regrow_days + " days";
+		var harvest_count = (crop.harvest && crop.harvest.min) ? crop.harvest.min : 1;
+		var profit_per_harvest = clean_zero(round(((Number(crop.sellPrice) || 0) * harvest_count) - (Number(crop.buy) || 0), 1));
+		
+		tooltip.innerHTML = ""
+			+ "<strong>" + crop.name + "</strong><br>"
+			+ "Growth: " + (Number(crop.growthDays) || 0) + " days<br>"
+			+ "Regrow: " + regrow_display + "<br>"
+			+ "Seed: " + format_dashboard_value(crop.buy, 0) + "g<br>"
+			+ "Sell: " + format_dashboard_value(crop.sellPrice, 1) + "g<br>"
+			+ "Profit/Harvest: " + format_dashboard_value(profit_per_harvest, 1) + "g";
+		tooltip.classList.remove("hidden");
+		move_crop_tooltip(event);
+	}
+	
+	// Tooltip helper: move tooltip near cursor while staying in viewport.
+	function move_crop_tooltip(event){
+		var tooltip = get_tooltip_element();
+		if (!tooltip || tooltip.classList.contains("hidden") || !event) return;
+		
+		var cursor_x = event.pageX;
+		var cursor_y = event.pageY;
+		if (typeof cursor_x != "number" || typeof cursor_y != "number"){
+			cursor_x = (event.clientX || 0) + window.pageXOffset;
+			cursor_y = (event.clientY || 0) + window.pageYOffset;
+		}
+		
+		var offset = 14;
+		var left = cursor_x + offset;
+		var top = cursor_y + offset;
+		var max_left = window.pageXOffset + window.innerWidth - tooltip.offsetWidth - 10;
+		var max_top = window.pageYOffset + window.innerHeight - tooltip.offsetHeight - 10;
+		left = Math.max(window.pageXOffset + 10, Math.min(left, max_left));
+		top = Math.max(window.pageYOffset + 10, Math.min(top, max_top));
+		
+		tooltip.style.left = left + "px";
+		tooltip.style.top = top + "px";
+	}
+	
+	// Tooltip helper: hide tooltip when cursor leaves crop row.
+	function hide_crop_tooltip(){
+		var tooltip = get_tooltip_element();
+		if (!tooltip) return;
+		tooltip.classList.add("hidden");
+		tooltip.style.left = "";
+		tooltip.style.top = "";
+	}
+	
+	// History helper: check if undo action is available.
+	function can_undo(){
+		return historyStack.length > 0;
+	}
+	
+	// History helper: check if redo action is available.
+	function can_redo(){
+		return redoStack.length > 0;
+	}
+	
+	// History helper: reset undo/redo stacks for non-history mutations.
+	function clear_history(){
+		historyStack.length = 0;
+		redoStack.length = 0;
+	}
+	
+	// History helper: serialize planner plans and navigation state only.
+	function serializePlannerState(){
+		var serialized_years = [];
+		$.each(self.years, function(i, year){
+			serialized_years.push(year.get_data() || {});
+		});
+		if (!serialized_years.length){
+			serialized_years.push({});
+		}
+		
+		return JSON.stringify({
+			years: serialized_years,
+			cmode: self.cmode,
+			cyearIndex: self.cyear ? self.cyear.index : 0,
+			cseasonIndex: self.cseason ? self.cseason.index : 0
+		});
+	}
+	
+	// History helper: restore planner state from a serialized snapshot.
+	function restorePlannerState(serialized_state){
+		if (!serialized_state) return false;
+		var state;
+		try {
+			state = typeof serialized_state == "string" ? JSON.parse(serialized_state) : serialized_state;
+		} catch(e){
+			return false;
+		}
+		
+		var year_states = (state.years && state.years.length) ? state.years : [{}];
+		self.years = [];
+		$.each(year_states, function(i, year_data){
+			var restored_year = new Year(i);
+			restored_year.set_data(year_data || {});
+			self.years.push(restored_year);
+		});
+		if (!self.years.length){
+			self.years = [new Year(0)];
+		}
+		
+		self.cmode = state.cmode == "greenhouse" ? "greenhouse" : "farm";
+		var cyear_index = parseInt(state.cyearIndex, 10);
+		if (isNaN(cyear_index)) cyear_index = 0;
+		cyear_index = Math.max(0, Math.min(cyear_index, self.years.length - 1));
+		self.cyear = self.years[cyear_index];
+		
+		var cseason_index = parseInt(state.cseasonIndex, 10);
+		if (isNaN(cseason_index)) cseason_index = 0;
+		cseason_index = Math.max(0, Math.min(cseason_index, self.seasons.length - 1));
+		self.cseason = self.seasons[cseason_index];
+		
+		self.newplan = new Plan;
+		self.editplan = null;
+		save_data();
+		update(self.years[0].data.farm, true);
+		update(self.years[0].data.greenhouse, true);
+		refreshProfitDashboard();
+		hide_crop_tooltip();
+		return true;
+	}
+	
+	// History helper: wrap only supported mutations with snapshot history.
+	function runWithHistory(action_fn){
+		var before_state = serializePlannerState();
+		var result = action_fn ? action_fn() : undefined;
+		var after_state = serializePlannerState();
+		if (before_state != after_state){
+			historyStack.push(before_state);
+			redoStack.length = 0;
+		}
+		return result;
+	}
+	
+	// History action: restore previous snapshot and stage current snapshot for redo.
+	function undo(){
+		if (!historyStack.length) return;
+		var current_state = serializePlannerState();
+		var previous_state = historyStack.pop();
+		if (restorePlannerState(previous_state)){
+			redoStack.push(current_state);
+		}
+	}
+	
+	// History action: restore next snapshot and stage current snapshot for undo.
+	function redo(){
+		if (!redoStack.length) return;
+		var current_state = serializePlannerState();
+		var next_state = redoStack.pop();
+		if (restorePlannerState(next_state)){
+			historyStack.push(current_state);
+		}
+	}
 	
 	
 	/********************************
@@ -707,6 +969,7 @@ function planner_controller($scope){
 				// Update plans
 				update(self.years[0].data.farm, true); // Update farm
 				update(self.years[0].data.greenhouse, true); // Update greenhouse
+				refreshProfitDashboard();
 				
 				self.loaded = true;
 				$scope.$apply();
@@ -891,16 +1154,21 @@ function planner_controller($scope){
 		// Update next year
 		if (full_update){
 			var next_year = farm.year.next();
-			if (!next_year) return;
-			update(next_year, true);
+			if (next_year){
+				update(next_year, true);
+			}
 		}
+		
+		refreshProfitDashboard();
 	}
 	
 	// Add self.newplan to plans list
 	function add_plan(date, auto_replant){
 		if (!validate_plan_amount()) return;
-		self.cyear.add_plan(self.newplan, date, auto_replant);
-		self.newplan = new Plan;
+		runWithHistory(function(){
+			self.cyear.add_plan(self.newplan, date, auto_replant);
+			self.newplan = new Plan;
+		});
 	}
 	
 	// Add plan to plans list on enter keypress
@@ -965,12 +1233,15 @@ function planner_controller($scope){
 	
 	// Remove plan from plans list of current farm/year
 	function remove_plan(date, index){
-		self.editplan = null;
-		self.cyear.remove_plan(date, index);
+		runWithHistory(function(){
+			self.editplan = null;
+			self.cyear.remove_plan(date, index);
+		});
 	}
 	
 	// Remove plans from current farm/season
 	function clear_season(season){
+		clear_history();
 		var full_update = self.cfarm().has_regrowing_crops(season);
 		for (var date = season.start; date <= season.end; date++){
 			self.cfarm().plans[date] = [];
@@ -981,6 +1252,7 @@ function planner_controller($scope){
 	
 	// Remove plans from current farm/year
 	function clear_year(year){
+		clear_history();
 		var farm = year.farm();
 		var full_update = farm.has_regrowing_crops();
 		$.each(farm.plans, function(date, plans){
@@ -993,6 +1265,7 @@ function planner_controller($scope){
 	// Remove all plans
 	function clear_all(){
 		if (!confirm("Permanently clear all plans?")) return;
+		clear_history();
 		self.years = [new Year(0)];
 		self.cyear = self.years[0];
 		save_data();
@@ -1020,6 +1293,8 @@ function planner_controller($scope){
 			if (!prev_year) return;
 			self.cyear = prev_year;
 		}
+		
+		refreshProfitDashboard();
 	}
 	
 	// Increment/decrement current season; creates new year if necessary
@@ -1046,6 +1321,7 @@ function planner_controller($scope){
 	function set_season(index){
 		self.cseason = self.seasons[index];
 		self.newplan.crop_id = null;
+		refreshProfitDashboard();
 	}
 	
 	// Get current farm object of current year
@@ -1071,6 +1347,7 @@ function planner_controller($scope){
 	// Set current farm mode
 	function set_mode(mode){
 		self.cmode = mode;
+		refreshProfitDashboard();
 	}
 	
 	////////////////////////////////
@@ -1278,6 +1555,7 @@ function planner_controller($scope){
 			// Toggle off
 			if (self.mode == view)
 				view = "";
+			hide_crop_tooltip();
 			
 			// Clear properties & save on close
 			if (!view){
@@ -1306,6 +1584,7 @@ function planner_controller($scope){
 		}
 		
 		function open_crop(crop){
+			hide_crop_tooltip();
 			self.mode = "cropinfo";
 			self.crop = crop;
 		}
@@ -1365,6 +1644,7 @@ function planner_controller($scope){
 					return;
 				}
 				
+				clear_history();
 				SAVE_JSON("plans", data.plans);
 				//SAVE_JSON("player", data.player);
 				
@@ -1382,6 +1662,7 @@ function planner_controller($scope){
 		
 		function legacy_import_data(){
 			if (!confirm("This will attempt to import planner data from the old v1 planner, and will overwrite any current plans. This change is not reversible and is not guaranteed to always work. Continue?")) return;
+			clear_history();
 			
 			// Load old v1 planner data
 			var plan_data = localStorage.getItem("crops");
